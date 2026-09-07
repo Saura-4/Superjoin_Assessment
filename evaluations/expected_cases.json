@@ -1,0 +1,24 @@
+{
+  "_note": "Evaluation fixtures only — NEVER imported by production code. Representative values observed in starter PDFs; production logic contains no filename/page/value rules.",
+  "normalization": [
+    {"raw": "740 Mn", "unit": "", "expect_norm": 740000000.0},
+    {"raw": "740M", "unit": "", "expect_norm": 740000000.0},
+    {"raw": "Rs 81,415 Mn", "unit": "", "expect_norm": 81415000000.0, "matches": "Rs 8,142 Cr"},
+    {"raw": "Rs 8,142 Cr", "unit": "", "expect_norm": 81420000000.0, "matches": "Rs 81,415 Mn"},
+    {"raw": "12.7%", "unit": "", "expect_norm": 12.7, "expect_unit": "PERCENT"},
+    {"raw": "2.8 Bn", "unit": "", "expect_norm": 2800000000.0}
+  ],
+  "periods": [
+    {"raw": "FY 2023-24", "expect": "FY24"},
+    {"raw": "Q4 FY24", "expect": "Q4-FY24"},
+    {"raw": "Q3 FY24", "expect": "Q3-FY24"},
+    {"raw": "March 31, 2024", "expect": "2024-03-31"}
+  ],
+  "relationships": [
+    {"name": "corroboration_740mn", "a": {"predicate": "express_parcels", "value_norm": 740000000.0, "unit_norm": "COUNT", "period_norm": "FY24", "scope": ""}, "b": {"predicate": "express_parcels", "value_norm": 740000000.0, "unit_norm": "COUNT", "period_norm": "FY24", "scope": ""}, "expect": "CORROBORATES"},
+    {"name": "normalization_revenue", "a": {"predicate": "revenue_from_services", "value_norm": 81415000000.0, "unit_norm": "INR", "period_norm": "FY24", "scope": "s"}, "b": {"predicate": "revenue_from_services", "value_norm": 81420000000.0, "unit_norm": "INR", "period_norm": "FY24", "scope": "s"}, "expect": "CORROBORATES"},
+    {"name": "quarter_vs_fy_pat", "a": {"predicate": "pat", "value_norm": 117000000.0, "unit_norm": "INR", "period_norm": "Q3-FY24", "scope": ""}, "b": {"predicate": "pat", "value_norm": -2491000000.0, "unit_norm": "INR", "period_norm": "FY24", "scope": ""}, "expect": "RECONCILED"},
+    {"name": "temporal_change", "a": {"predicate": "express_parcels", "value_norm": 100.0, "unit_norm": "COUNT", "period_norm": "FY22", "scope": ""}, "b": {"predicate": "express_parcels", "value_norm": 200.0, "unit_norm": "COUNT", "period_norm": "FY24", "scope": ""}, "expect": "TEMPORAL_CHANGE"},
+    {"name": "contradiction", "a": {"predicate": "x", "value_norm": 100.0, "unit_norm": "INR", "period_norm": "FY24", "scope": "s"}, "b": {"predicate": "x", "value_norm": 999.0, "unit_norm": "INR", "period_norm": "FY24", "scope": "s"}, "expect": "CONTRADICTS"}
+  ]
+}

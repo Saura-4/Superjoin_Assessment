@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.db
+.pytest_cache/
+data/
+*.log
+.env
+.streamlit/secrets.toml
+starter-datasets.zip
+
+superjoin-vit-2026-assignment.pdf
+starter-datasets.zip
+unzipped_starter

@@ -1,0 +1,4 @@
+pypdf>=4
+pymupdf>=1.23
+pytest>=8
+streamlit>=1.33
