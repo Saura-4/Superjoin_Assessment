@@ -41,6 +41,55 @@ def test_factory_defaults_to_mock_without_key():
     assert isinstance(get_provider("mock"), MockProvider)
 
 
+def test_gemini_rotation_on_429(monkeypatch):
+    import io
+    import urllib.error
+
+    from src.llm import GeminiProvider
+    monkeypatch.setenv("GEMINI_API_KEY", "key-one")
+    monkeypatch.delenv("GEMINI_API_KEY2", raising=False)
+    monkeypatch.setenv("GEMINI_FALLBACK_MODELS", "fallback-model")
+    monkeypatch.setenv("GEMINI_MIN_INTERVAL", "0")
+    p = GeminiProvider(cache_dir=None, max_retries=1)
+    seen_urls: list[str] = []
+
+    def fake_post(url, data):
+        seen_urls.append(url)
+        if "3.1-flash-lite" in url:
+            raise urllib.error.HTTPError(url, 429, "too many", {}, io.BytesIO(b"{}"))
+        return {"candidates": [{"content": {"parts": [{"text": '{"ok": 2}'}]}}]}
+
+    p._post = fake_post  # type: ignore[method-assign]
+    assert p.generate_json("hi", cache_key="") == {"ok": 2}
+    assert any("3.1-flash-lite" in u for u in seen_urls)
+    assert any("fallback-model" in u for u in seen_urls)
+
+
+def test_gemini_second_key_picked_up_live(monkeypatch):
+    import io
+    import urllib.error
+
+    from src.llm import GeminiProvider
+    monkeypatch.setenv("GEMINI_API_KEY", "key-one")
+    monkeypatch.delenv("GEMINI_API_KEY2", raising=False)
+    monkeypatch.setenv("GEMINI_FALLBACK_MODELS", "")
+    monkeypatch.setenv("GEMINI_MIN_INTERVAL", "0")
+    p = GeminiProvider(cache_dir=None, max_retries=1)
+    seen: list[str] = []
+
+    def fake_post(url, data):
+        seen.append(url)
+        if "key-one" in url:
+            raise urllib.error.HTTPError(url, 429, "slow down", {}, io.BytesIO(b"{}"))
+        return {"candidates": [{"content": {"parts": [{"text": '{"ok": 3}'}]}}]}
+
+    p._post = fake_post  # type: ignore[method-assign]
+    # user mints key 2 mid-run → rotation must see it without reconstructing
+    monkeypatch.setenv("GEMINI_API_KEY2", "key-two")
+    assert p.generate_json("hi", cache_key="") == {"ok": 3}
+    assert any("key-two" in u for u in seen)
+
+
 def test_gemini_pacing_and_post_split(monkeypatch):
     import time
 
