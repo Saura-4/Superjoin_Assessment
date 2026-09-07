@@ -29,7 +29,9 @@ def test_incremental_duplicate_reuse(tmp_path):
     ex.extract_facts_from_text = fake
     try:
         # use a tiny fake PDF path? use real PPT but cap pages for speed
-        r1 = process_document(conn, MockProvider(), c["id"], PPT, data_dir=tmp_path / "data", max_pages=3)
+        r1 = process_document(conn, MockProvider(), c["id"], PPT, data_dir=tmp_path / "data",
+                                max_pages=3, filename="q4-fy24-earnings.pdf")
+        assert r1["document"]["filename"] == "q4-fy24-earnings.pdf"
         n_facts = len(list_facts(conn, c["id"], limit=100000))
         r2 = process_document(conn, MockProvider(), c["id"], PPT, data_dir=tmp_path / "data", max_pages=3)
         assert r2["duplicate"] is True

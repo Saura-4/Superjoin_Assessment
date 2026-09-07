@@ -19,6 +19,7 @@ from src.db import (
     list_page_status,
     list_relationships,
     list_relationships_for_fact,
+    rename_document,
     update_document_status,
     update_job,
     upsert_page_status,
@@ -91,4 +92,14 @@ def test_jobs_pages():
     upsert_page_status(conn, d["id"], 1, "ok", attempts=1, text_len=500, quality="good")
     upsert_page_status(conn, d["id"], 1, "ok", attempts=2, text_len=500, quality="good")
     assert len(list_page_status(conn, d["id"])) == 1
+    conn.close()
+
+
+def test_rename_document():
+    from src.db import get_document
+    conn = _tmpdb()
+    c = create_collection(conn, "c")
+    d = create_document(conn, c["id"], "tmp1234.pdf", "hx")
+    rename_document(conn, d["id"], "annual-report.pdf")
+    assert get_document(conn, d["id"])["filename"] == "annual-report.pdf"
     conn.close()

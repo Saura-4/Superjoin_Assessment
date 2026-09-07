@@ -14,7 +14,6 @@ from pathlib import Path
 import streamlit as st
 
 from src.db import (
-    get_collection,
     init_db,
     list_collections,
     list_documents,
@@ -75,11 +74,12 @@ with tabs[0]:
             with st.spinner(f"Processing {f.name}…"):
                 try:
                     res = process_document(db, provider, col["id"], tmp_path, data_dir=DATA_DIR,
-                                           max_pages=max_pages, scope="current" if scope == "current" else "all")
+                                           max_pages=max_pages, scope="current" if scope == "current" else "all",
+                                           filename=f.name)
                 except Exception as e:
                     st.error(f"{f.name}: {e}")
                     continue
-            # rename stored filename for clarity
+            # duplicate uploads reuse prior work via content hash (see pipeline.py)
             if res["duplicate"]:
                 st.warning(f"{f.name}: duplicate (hash match) — reused, no rebuild.")
             else:

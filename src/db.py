@@ -219,6 +219,12 @@ def update_document_status(
     conn.commit()
 
 
+def rename_document(conn: sqlite3.Connection, document_id: str, filename: str) -> None:
+    """Store the user-facing filename (uploads may arrive as temp paths)."""
+    conn.execute("UPDATE documents SET filename = ? WHERE id = ?", (filename, document_id))
+    conn.commit()
+
+
 # ---- facts ----
 
 def create_fact(

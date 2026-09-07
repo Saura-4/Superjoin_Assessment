@@ -19,6 +19,7 @@ from src.db import (
     list_documents,
     list_facts,
     list_relationships,
+    rename_document,
     update_document_status,
     update_job,
     upsert_page_status,
@@ -64,8 +65,12 @@ def process_document(
     data_dir: str | Path = "data",
     max_pages: Optional[int] = None,
     scope: str = "current",
+    filename: Optional[str] = None,
 ) -> dict[str, Any]:
-    """Full incremental ingest for one PDF. Duplicate hash → reuse, no rework."""
+    """Full incremental ingest for one PDF. Duplicate hash → reuse, no rework.
+
+    `filename` is the user-facing name (uploads arrive as temp paths).
+    """
     job = create_job(conn, "ingest", collection_id)
     try:
         ing = ingest_pdf(conn, collection_id, pdf_path, data_dir=data_dir)
@@ -78,6 +83,9 @@ def process_document(
                 "relationships_added": 0, "failures": []}
 
     doc = ing["document"]
+    if filename and not ing["duplicate"]:
+        rename_document(conn, doc["id"], Path(filename).name)
+        doc = get_doc(conn, doc["id"])
     pages = ing["pages"][:max_pages] if max_pages else ing["pages"]
     scope_ids = resolve_scope(conn, collection_id, scope)
     facts_added, rels_added, failures = 0, 0, []

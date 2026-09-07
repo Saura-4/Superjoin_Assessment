@@ -6,6 +6,7 @@ so fact → evidence → document/page is always traceable.
 """
 from __future__ import annotations
 
+import hashlib
 import re
 import sqlite3
 from typing import Any
@@ -95,9 +96,11 @@ def extract_facts_from_text(
         f"SOURCE (page {page}, truncated to {MAX_SOURCE_CHARS} chars):\n{text[:MAX_SOURCE_CHARS]}"
         f"\n\nReturn at most {max_facts} facts as JSON."
     )
+    # NOTE: sha256 (stable) — never builtin hash() (randomized per process).
+    text_key = hashlib.sha256(text.encode()).hexdigest()[:16]
     try:
         payload = provider.generate_json(prompt, system=EXTRACT_SYSTEM,
-                                         cache_key=f"extract:p{page}:{hash(text) & 0xffffffff}")
+                                         cache_key=f"extract:p{page}:{text_key}")
     except LLMError:
         return []
     out: list[dict[str, Any]] = []
