@@ -33,7 +33,10 @@ def main() -> int:
     fails: list[str] = []
     for p, name in ((ANNUAL, "annual"), (PPT, "ppt"), (PROSPECTUS, "prospectus")):
         if not p.is_file():
-            print(f"SKIP: {name} excerpt not found at {p}")
+            print(f"SKIP: starter excerpt not found: {p}")
+            print("These excerpts are intentionally git-ignored local test data, not a failure.")
+            print("To run this check: unzip starter-datasets.zip so that")
+            print("  unzipped_starter/starter-datasets/delhivery/*.pdf exists, then re-run.")
             return 2
     annual_text = "\n".join(p["text"] for p in extract_pages(ANNUAL))
     ppt_text = "\n".join(p["text"] for p in extract_pages(PPT))

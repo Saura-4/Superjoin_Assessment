@@ -11,11 +11,17 @@ DELHIVERY = Path("unzipped_starter/starter-datasets/delhivery")
 PPT = DELHIVERY / "03-delhivery-q4-fy24-earnings-presentation.pdf"
 PROSPECTUS = DELHIVERY / "01-delhivery-prospectus-2022-excerpt.pdf"
 
+needs_starter = pytest.mark.skipif(
+    not PPT.is_file() or not PROSPECTUS.is_file(),
+    reason="starter PDFs are local-only test data (git-ignored), not present in a fresh clone",
+)
+
 
 def _tmpdb(tmp_path):
     return init_db(tmp_path / "t.db")
 
 
+@needs_starter
 def test_page_numbering_and_quality_counts():
     pages = extract_pages(PROSPECTUS)
     assert len(pages) == 100
@@ -23,6 +29,7 @@ def test_page_numbering_and_quality_counts():
     assert quality_for_text(pages[0]["text"]) in ("good", "low")
 
 
+@needs_starter
 def test_low_text_detection_chart_pdf():
     pages = extract_pages(PPT)
     assert len(pages) == 27
@@ -38,6 +45,7 @@ def test_quality_thresholds():
     assert quality_for_text("x " * 200) == "good"
 
 
+@needs_starter
 def test_ingest_duplicate_and_pages(tmp_path):
     conn = _tmpdb(tmp_path)
     c = create_collection(conn, "delhivery")

@@ -1,11 +1,21 @@
 """Tasks 9-10 tests: incremental reuse + scope resolution."""
+from pathlib import Path
+
+import pytest
+
 from src.db import init_db, list_facts, list_relationships
 from src.llm import MockProvider
 from src.pipeline import collection_stats, get_or_create_collection, process_document, resolve_scope
 
 PPT = "unzipped_starter/starter-datasets/delhivery/03-delhivery-q4-fy24-earnings-presentation.pdf"
 
+needs_starter = pytest.mark.skipif(
+    not Path(PPT).is_file(),
+    reason="starter PDFs are local-only test data (git-ignored), not present in a fresh clone",
+)
 
+
+@needs_starter
 def test_incremental_duplicate_reuse(tmp_path):
     conn = init_db(tmp_path / "t.db")
     c = get_or_create_collection(conn, "delhivery")

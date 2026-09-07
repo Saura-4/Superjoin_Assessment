@@ -35,6 +35,22 @@ Without a key the app runs fully offline on the mock provider (extraction return
 empty, deterministic engine + evaluations still run). No credentials are committed;
 see `.gitignore` (`data/`, `*.db`, `.env` excluded).
 
+## Starter data (git-ignored, local-only)
+
+The starter PDF excerpts are intentionally **not** in git. A fresh clone contains
+code only. To run dataset-dependent checks, unzip `starter-datasets.zip` (from the
+assignment bundle) so this layout exists:
+
+```
+unzipped_starter/starter-datasets/delhivery/*.pdf
+unzipped_starter/starter-datasets/india-macroeconomy/*.pdf
+```
+
+Behavior without the excerpts: `pytest` runs the offline suite and **skips** the 4
+dataset tests; `evaluate.py` passes fully offline; `verify_delhivery.py` exits 2
+with placement instructions instead of a confusing traceback. The UI works without
+them — upload any PDF to a collection.
+
 ## Reproducing the four demo cases (Delhivery)
 
 1. Create collection `delhivery` in the sidebar.
@@ -130,7 +146,7 @@ demo fits comfortably in free-tier quotas (429s are retried with backoff).
 ## Tests / evaluation
 
 ```bash
-python -m pytest tests/ -q          # 32 unit tests (db/ingest/llm/normalize/extract/retrieve+relate/pipeline)
+python -m pytest tests/ -q          # 34 tests; 4 dataset tests skip without local excerpts
 python evaluations/evaluate.py      # 19 offline checks from expected_cases.json (never imported by prod code)
 python evaluations/verify_delhivery.py  # real-PDF evidence + decision verification
 ```
