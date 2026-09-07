@@ -192,7 +192,9 @@ Preserve original values/claims.
 
 ### Level 3 — Semantic candidate retrieval
 
-Use embeddings or another semantic index only to find potentially related facts.
+Semantic retrieval is an **optional extension**, not a claim that the current prototype has a production embedding index. The current implementation uses selective deterministic/token-based candidate retrieval behind a retrieval abstraction.
+
+If embeddings are later added, they must be used only for candidate generation/ranking, never as the final relationship classifier.
 
 ### Level 4 — LLM judgment
 
@@ -202,13 +204,15 @@ Provide Fact A, its evidence, Fact B, its evidence, and relevant context—not e
 
 ## 9. PDF Processing
 
-Process PDFs page/section-wise.
+The current baseline is **page-aware processing**. It is not yet a sophisticated section-aware semantic chunking system.
 
 Pipeline:
 
 PDF → page extraction → extraction quality → fact extraction → evidence → normalization → persistence
 
 Architecture should support large PDFs, multiple PDFs, resumability, and future parallelism without introducing unnecessary distributed infrastructure.
+
+The extraction layer bounds the source text supplied to the model and preserves page provenance. More advanced section-aware chunking should be added only if real PDFs demonstrate that page-level context is insufficient.
 
 Track page status when practical:
 
@@ -246,7 +250,7 @@ Provider boundary should leave room for structured output, retries, rate limitin
 
 Start with one real provider plus a mock. Do not build a large provider framework.
 
-Current pricing/limits must be checked against current provider documentation before locking a provider.
+Current provider configuration and pricing/limits must be checked against current provider documentation before final submission claims are made.
 
 ## 12. Cost Strategy
 
@@ -255,7 +259,7 @@ Target free or very low cost.
 Prefer:
 - local PDF parsing
 - deterministic normalization
-- local/inexpensive embeddings
+- local/inexpensive embeddings if later justified
 - SQLite
 - caching
 - LLM calls only where judgment is needed
@@ -336,7 +340,7 @@ Expected: TEMPORAL_CHANGE or temporal reconciliation rather than blindly claimin
 Expected: RECONCILED because reporting periods/granularity differ.
 
 ### Case 4 — Extraction failure
-Chart/visual-heavy earnings-presentation pages can be poorly represented by the PDF text layer.
+Chart/visual-heavy pages can be poorly represented by the PDF text layer.
 
 Expected: detect low extraction quality, avoid fabricated facts, surface uncertainty/failure, and optionally support vision fallback.
 
@@ -392,7 +396,71 @@ Prioritize:
 
 Avoid authentication, Kubernetes, microservices, graph databases, elaborate frontend architecture, distributed queues, and excessive UI polish unless genuinely required.
 
-## 19. Definition of Done
+## 19. Current Implementation Status — 2026-09-07
+
+The original implementation plan in `context/TASK.md` has been completed. **Do not amend `TASK.md` for post-implementation work.**
+
+The repository currently contains the working prototype and has been pushed to GitHub.
+
+Verified locally with the starter PDFs supplied separately:
+
+- `pytest -q` → **32 passed**
+- `python evaluations/evaluate.py` → **19 checks passed**
+- `python evaluations/verify_delhivery.py` → **DEMO VERIFICATION PASSED**
+
+The verification covered corroboration, numerical normalization, contextual reconciliation, temporal change, and extraction-failure handling.
+
+Starter PDFs are intentionally kept out of Git and remain git-ignored/local-only. This is expected. The repository is not empty and should not be treated as a blank starter repository.
+
+### Implemented now
+
+- SQLite persistence
+- collections/documents/facts/evidence/relationships
+- content-hash duplicate detection
+- page-aware PDF extraction
+- extraction-quality/failure handling
+- generic structured fact extraction
+- evidence grounding
+- deterministic normalization
+- selective deterministic candidate retrieval
+- relationship engine with deterministic reasoning and LLM fallback
+- incremental processing
+- comparison scope
+- Streamlit UI
+- mock + real LLM provider boundary
+- evaluation suite
+- Delhivery verification script
+- README/setup documentation
+
+### Not yet proven to be necessary / not currently implemented as full features
+
+- production-grade embedding/vector retrieval
+- sophisticated semantic section chunking
+- vision fallback
+- page bounding-box highlighting
+- graph visualization
+
+These are optional extensions. They must not be added merely to make the architecture sound more advanced.
+
+## 20. Post-Implementation Work
+
+The next phase is defined in **`context/TASK2.md`**.
+
+`TASK2.md` is the active Muse instruction file for hardening and submission readiness. It starts with a full codebase audit and then prioritizes:
+
+1. clean setup/reproducibility
+2. real three-PDF LLM run
+3. fact/evidence quality inspection
+4. relationship-quality inspection
+5. four mandatory demo cases
+6. UI end-to-end verification
+7. evaluation hardening
+8. truthful README/submission preparation
+9. ≤3-minute demo video
+
+Do not jump directly to embeddings, vision, or frontend redesign before these P0 checks are complete.
+
+## 21. Definition of Done
 
 A user can:
 
@@ -401,3 +469,5 @@ Create collection → upload PDFs → process → inspect facts → open evidenc
 The system accepts unseen PDFs and demonstrates the four required cases without special-casing them.
 
 The repository runs from README instructions, accepts new PDFs, shows evidence and cross-document relationships, and explains limitations/next steps.
+
+For final submission, the reviewer should be able to understand what is implemented, reproduce the core workflow, see the four mandatory cases, and clearly distinguish implemented functionality from optional future improvements.
