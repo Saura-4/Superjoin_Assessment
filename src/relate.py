@@ -193,3 +193,30 @@ def relate_new_facts(conn: sqlite3.Connection, provider: LLMProvider, facts: lis
                                            dec["type"], dec.get("confidence", 0.5),
                                            dec.get("reason", ""), dec.get("dimensions", {})))
     return out
+
+
+def relate_unlinked_facts(conn: sqlite3.Connection, provider: LLMProvider,
+                          collection_id: str, document_id: str,
+                          collection_ids: Optional[list[str]] = None) -> list[dict[str, Any]]:
+    """Heal interrupted runs: relate doc facts that have no relationships yet.
+
+    Pages are marked processed before relating, so a kill leaves processed-but-
+    unlinked facts; resume must link them instead of returning early.
+    """
+    rows = [dict(r) for r in conn.execute(
+        "SELECT * FROM facts WHERE collection_id = ? AND document_id = ?",
+        (collection_id, document_id)).fetchall()]
+    if not rows:
+        return []
+    linked: set[str] = set()
+    for r in conn.execute(
+            "SELECT fact_a_id, fact_b_id FROM relationships WHERE collection_id = ?",
+            (collection_id,)).fetchall():
+        linked.add(r[0])
+        linked.add(r[1])
+    unlinked = [f for f in rows if f["id"] not in linked]
+    if not unlinked:
+        return []
+    lookup = {e["fact_id"]: e["text"] for e in conn.execute(
+        "SELECT fact_id, text FROM evidence WHERE document_id = ?", (document_id,)).fetchall()}
+    return relate_new_facts(conn, provider, unlinked, collection_ids, lookup)

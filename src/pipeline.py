@@ -29,7 +29,7 @@ from src.db import (
 from src.extract import extract_facts_from_text, persist_facts_with_evidence
 from src.ingest import ingest_pdf, load_cached_page_text
 from src.llm import LLMProvider
-from src.relate import relate_new_facts
+from src.relate import relate_new_facts, relate_unlinked_facts
 
 RESUMABLE_STATUSES = {"extracted", "low_text", "pending", "failed"}
 
@@ -86,9 +86,15 @@ def process_document(
         statuses = {p["page"]: p for p in list_page_status(conn, ing["document"]["id"])}
         todo = sorted(p for p, s in statuses.items() if s["status"] in RESUMABLE_STATUSES)
         if not todo:
+            # fully processed: heal any facts left unlinked by an interrupted
+            # relate phase, then reuse without rebuild.
+            scope_ids = resolve_scope(conn, collection_id, scope)
+            healed = relate_unlinked_facts(conn, provider, collection_id,
+                                           ing["document"]["id"], scope_ids)
+            update_document_status(conn, ing["document"]["id"], "ready")
             update_job(conn, job["id"], "done", error="duplicate_reused")
-            return {"document": ing["document"], "duplicate": True, "facts_added": 0,
-                    "relationships_added": 0, "failures": []}
+            return {"document": get_doc(conn, ing["document"]["id"]), "duplicate": True,
+                    "facts_added": 0, "relationships_added": len(healed), "failures": []}
         doc = ing["document"]
         pages = [{"page": p,
                   "text": load_cached_page_text(data_dir, collection_id, doc["id"], p),

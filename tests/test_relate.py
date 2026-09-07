@@ -86,6 +86,21 @@ def test_relate_new_facts_batches(tmp_path):
     conn.close()
 
 
+def test_relate_unlinked_facts_heals_and_idempotent(tmp_path):
+    from src.relate import relate_unlinked_facts
+    conn = init_db(tmp_path / "t.db")
+    c1 = create_collection(conn, "c1")
+    d1 = create_document(conn, c1["id"], "a.pdf", "h1")
+    create_fact(conn, c1["id"], d1["id"], subject="S", predicate="p",
+                claim="c1", value_raw="10", value_norm=10.0, unit_norm="COUNT", period_norm="FY24")
+    create_fact(conn, c1["id"], d1["id"], subject="S", predicate="p",
+                claim="c2", value_raw="10", value_norm=10.0, unit_norm="COUNT", period_norm="FY24")
+    healed = relate_unlinked_facts(conn, MockProvider(), c1["id"], d1["id"], [c1["id"]])
+    assert any(r["type"] == "CORROBORATES" for r in healed)
+    assert relate_unlinked_facts(conn, MockProvider(), c1["id"], d1["id"], [c1["id"]]) == []
+    conn.close()
+
+
 def test_retrieval_selective_and_scoped(tmp_path):
     conn = init_db(tmp_path / "t.db")
     c1 = create_collection(conn, "delhivery")
