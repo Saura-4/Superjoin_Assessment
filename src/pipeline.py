@@ -18,16 +18,20 @@ from src.db import (
     get_collection_by_name,
     list_documents,
     list_facts,
+    list_page_status,
     list_relationships,
+    page_has_facts,
     rename_document,
     update_document_status,
     update_job,
     upsert_page_status,
 )
 from src.extract import extract_facts_from_text, persist_facts_with_evidence
-from src.ingest import ingest_pdf
+from src.ingest import ingest_pdf, load_cached_page_text
 from src.llm import LLMProvider
 from src.relate import relate_new_fact
+
+RESUMABLE_STATUSES = {"extracted", "low_text", "pending", "failed"}
 
 
 def get_or_create_collection(conn: sqlite3.Connection, name: str, description: str = "") -> dict[str, Any]:
@@ -78,21 +82,37 @@ def process_document(
         update_job(conn, job["id"], "failed", error=str(exc)[:500])
         raise
     if ing["duplicate"]:
-        update_job(conn, job["id"], "done", error="duplicate_reused")
-        return {"document": ing["document"], "duplicate": True, "facts_added": 0,
-                "relationships_added": 0, "failures": []}
-
-    doc = ing["document"]
-    if filename and not ing["duplicate"]:
-        rename_document(conn, doc["id"], Path(filename).name)
-        doc = get_doc(conn, doc["id"])
-    pages = ing["pages"][:max_pages] if max_pages else ing["pages"]
+        # Resume interrupted runs: reprocess pages never finished, else reuse.
+        statuses = {p["page"]: p for p in list_page_status(conn, ing["document"]["id"])}
+        todo = sorted(p for p, s in statuses.items() if s["status"] in RESUMABLE_STATUSES)
+        if not todo:
+            update_job(conn, job["id"], "done", error="duplicate_reused")
+            return {"document": ing["document"], "duplicate": True, "facts_added": 0,
+                    "relationships_added": 0, "failures": []}
+        doc = ing["document"]
+        pages = [{"page": p,
+                  "text": load_cached_page_text(data_dir, collection_id, doc["id"], p),
+                  "quality": statuses[p]["quality"]} for p in todo]
+        update_job(conn, job["id"], "done", error=None)
+    else:
+        doc = ing["document"]
+        if filename and not ing["duplicate"]:
+            rename_document(conn, doc["id"], Path(filename).name)
+            doc = get_doc(conn, doc["id"])
+        pages = ing["pages"][:max_pages] if max_pages else ing["pages"]
+    if max_pages:
+        pages = pages[:max_pages]
     scope_ids = resolve_scope(conn, collection_id, scope)
     facts_added, rels_added, failures = 0, 0, []
     evidence_lookup: dict[str, str] = {}
 
     for p in pages:
         page_no, text, quality = p["page"], p["text"], p.get("quality", "unknown")
+        if page_has_facts(conn, doc["id"], page_no):
+            # interrupted run already persisted this page's facts: skip, don't duplicate
+            upsert_page_status(conn, doc["id"], page_no, status="processed",
+                               attempts=1, text_len=len(text), quality=quality)
+            continue
         if quality == "empty":
             upsert_page_status(conn, doc["id"], page_no, status="empty_no_text",
                                attempts=1, text_len=len(text), quality=quality)

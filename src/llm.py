@@ -85,15 +85,21 @@ class MockProvider(LLMProvider):
 @dataclass
 class GeminiProvider(LLMProvider):
     api_key: str = ""
-    model: str = "gemini-2.5-flash"
+    model: str = "gemini-3.1-flash-lite"
     timeout_s: float = 60.0
     max_retries: int = 4
     cache_dir: Optional[str] = None
     name: str = "gemini"
+    min_interval_s: float = 4.2  # client-side pacing for low free-tier RPM (e.g. 15)
+    _last_call: float = 0.0
 
     def __post_init__(self):
         self.api_key = self.api_key or os.environ.get("GEMINI_API_KEY", "")
         self.model = os.environ.get("GEMINI_MODEL", self.model)
+        try:
+            self.min_interval_s = float(os.environ.get("GEMINI_MIN_INTERVAL", self.min_interval_s))
+        except ValueError:
+            pass
         if not self.api_key:
             raise LLMConfigError("GEMINI_API_KEY is not set (get a free key at https://aistudio.google.com)")
 
@@ -102,6 +108,11 @@ class GeminiProvider(LLMProvider):
             return None
         h = hashlib.sha256(f"{self.model}::{key}".encode()).hexdigest()
         return Path(self.cache_dir) / f"{h}.json"
+
+    def _post(self, url: str, data: bytes) -> dict[str, Any]:
+        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
+            return json.loads(resp.read().decode())
 
     def generate_json(self, prompt: str, system: str = "", cache_key: str = "") -> Any:
         cp = self._cache_path(cache_key or prompt[:2000])
@@ -120,9 +131,11 @@ class GeminiProvider(LLMProvider):
         last_err: Exception | None = None
         for attempt in range(self.max_retries):
             try:
-                req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
-                with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
-                    payload = json.loads(resp.read().decode())
+                gap = time.time() - self._last_call
+                if gap < self.min_interval_s:
+                    time.sleep(self.min_interval_s - gap)
+                self._last_call = time.time()
+                payload = self._post(url, data)
                 parts = payload.get("candidates", [{}])[0].get("content", {}).get("parts", [])
                 text = "".join(p.get("text", "") for p in parts)
                 parsed = extract_json(text)

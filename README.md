@@ -26,7 +26,7 @@ Optional (real extraction + ambiguous-case judgments; free tier):
 ```bash
 # get a free key at https://aistudio.google.com
 set GEMINI_API_KEY=your_key        # Windows cmd; $env:GEMINI_API_KEY="..." in PowerShell
-set GEMINI_MODEL=gemini-2.5-flash  # default
+set GEMINI_MODEL=gemini-3.1-flash-lite  # default (verified free-tier, most RPD headroom)
 set LLM_PROVIDER=gemini
 streamlit run app.py
 ```

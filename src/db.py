@@ -228,6 +228,15 @@ def rename_document(conn: sqlite3.Connection, document_id: str, filename: str) -
     conn.commit()
 
 
+def page_has_facts(conn: sqlite3.Connection, document_id: str, page: int) -> bool:
+    """True if evidence already exists for doc+page (crash-safe resume guard)."""
+    row = conn.execute(
+        "SELECT 1 FROM evidence WHERE document_id = ? AND page = ? LIMIT 1",
+        (document_id, page),
+    ).fetchone()
+    return row is not None
+
+
 # ---- facts ----
 
 def create_fact(
