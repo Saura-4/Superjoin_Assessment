@@ -101,6 +101,28 @@ def test_relate_unlinked_facts_heals_and_idempotent(tmp_path):
     conn.close()
 
 
+def test_different_subjects_never_blind_contradiction():
+    from src.relate import deterministic_decide
+    a = _fact(subject="Kapil Bharati", predicate="cost", value_norm=35.0,
+              unit_norm="INR", period_norm="FY24", scope="",
+              qualifiers={})
+    b = _fact(subject="CA Swift Investments", predicate="cost", value_norm=139.0,
+              unit_norm="INR", period_norm="FY24", scope="",
+              qualifiers={})
+    assert deterministic_decide(a, b) is None  # needs LLM, must not CONTRADICT
+
+
+def test_differing_qualifiers_need_judgment():
+    from src.relate import deterministic_decide
+    a = _fact(subject="S", predicate="benefit", value_norm=98.0,
+              unit_norm="INR", period_norm="", scope="",
+              qualifiers={"condition": "ceases before 1yr"})
+    b = _fact(subject="S", predicate="benefit", value_norm=49.0,
+              unit_norm="INR", period_norm="", scope="",
+              qualifiers={"condition": "ceases after 1yr"})
+    assert deterministic_decide(a, b) is None
+
+
 def test_retrieval_selective_and_scoped(tmp_path):
     conn = init_db(tmp_path / "t.db")
     c1 = create_collection(conn, "delhivery")

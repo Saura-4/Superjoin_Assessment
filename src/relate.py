@@ -13,7 +13,7 @@ from typing import Any, Optional
 
 from src.db import create_relationship
 from src.llm import LLMError, LLMProvider
-from src.retrieve import find_candidates
+from src.retrieve import find_candidates, subject_compatible
 
 REL_TYPES = {"CORROBORATES", "CONTRADICTS", "RECONCILED", "TEMPORAL_CHANGE", "UNRELATED", "UNCERTAIN"}
 
@@ -21,7 +21,7 @@ REL_TOL = 0.02  # 2% rounding tolerance for cross-document numeric agreement
 
 JUDGE_SYSTEM = """You judge the relationship between two extracted facts.
 Return JSON only: {"type": one of CORROBORATES/CONTRADICTS/RECONCILED/TEMPORAL_CHANGE/UNRELATED/UNCERTAIN, "confidence": 0-1, "reason": "1-2 sentences citing periods/scopes/units"}.
-Rules: same metric+period+scope with equal values (after units) = CORROBORATES. Same metric+period+scope with different values = CONTRADICTS. Same metric but different period granularity/scope/definitions explaining the gap = RECONCILED (name the dimension). Same metric, different time points, changed value = TEMPORAL_CHANGE, not contradiction. Different metrics = UNRELATED. Unclear = UNCERTAIN."""
+Rules: same metric+period+scope with equal values (after units) = CORROBORATES. Same metric+period+scope with different values = CONTRADICTS. Same metric but different period granularity/scope/definitions explaining the gap = RECONCILED (name the dimension). Same metric, different time points, changed value = TEMPORAL_CHANGE, not contradiction. Different subjects/entities with different values = UNRELATED, never a contradiction. Differing qualifiers/conditions = RECONCILED or UNRELATED, not CONTRADICTS. Different metrics = UNRELATED. Unclear = UNCERTAIN."""
 
 
 def values_equal(v1: Optional[float], v2: Optional[float], tol: float = REL_TOL) -> Optional[bool]:
@@ -47,10 +47,24 @@ def _fy_of(period_norm: str) -> Optional[str]:
     return None
 
 
+def _quals(f: dict[str, Any]) -> dict[str, Any]:
+    q = f.get("qualifiers", {})
+    if isinstance(q, str):
+        try:
+            q = json.loads(q)
+        except (json.JSONDecodeError, ValueError):
+            return {}
+    return q if isinstance(q, dict) else {}
+
+
 def deterministic_decide(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any] | None:
     """Return decision dict or None when genuinely ambiguous (needs LLM)."""
     if a.get("predicate") != b.get("predicate"):
         return None  # predicate semantics need judgment
+    if not subject_compatible(a.get("subject", ""), b.get("subject", "")):
+        return None  # different entities (e.g. two shareholders' costs) — never a blind contradiction
+    if _quals(a) and _quals(b) and _quals(a) != _quals(b):
+        return None  # differing conditions/qualifiers need judgment, not a numeric verdict
     pa, pb = a.get("period_norm") or "", b.get("period_norm") or ""
     sa, sb = (a.get("scope") or "").strip().lower(), (b.get("scope") or "").strip().lower()
     ua, ub = a.get("unit_norm") or "", b.get("unit_norm") or ""
@@ -129,7 +143,7 @@ def _judge_chunk(provider: LLMProvider, pairs: list[tuple[dict[str, Any], str, d
                 " with exactly one entry per pair, same order.")
     try:
         out = provider.generate_json(prompt, system=JUDGE_SYSTEM,
-                                     cache_key=f"judge-batch:{pairs[0][0]['id']}:{len(pairs)}")
+                                     cache_key=f"judge-batch-v2:{pairs[0][0]['id']}:{len(pairs)}")
     except LLMError:
         return [uncertain("LLM unavailable; marked uncertain.") for _ in pairs]
     decs = out.get("decisions", []) if isinstance(out, dict) else []
@@ -149,8 +163,10 @@ def _judge_chunk(provider: LLMProvider, pairs: list[tuple[dict[str, Any], str, d
 
 
 def _slim(f: dict[str, Any]) -> dict[str, Any]:
-    return {k: f.get(k) for k in ("subject", "predicate", "value_raw", "unit_raw",
+    slim = {k: f.get(k) for k in ("subject", "predicate", "value_raw", "unit_raw",
                                   "period_raw", "scope", "claim")}
+    slim["qualifiers"] = _quals(f)
+    return slim
 
 
 def relate_pair(provider: LLMProvider, a: dict[str, Any], b: dict[str, Any],
