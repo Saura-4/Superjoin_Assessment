@@ -93,6 +93,7 @@ class GeminiProvider(LLMProvider):
     name: str = "gemini"
     min_interval_s: float = 4.2  # client-side pacing for low free-tier RPM (e.g. 15)
     _last_call: float = 0.0
+    _dead_combos: object = None  # replaced per-instance in __post_init__ (session circuit breaker)
 
     def __post_init__(self):
         self.api_key = self.api_key or os.environ.get("GEMINI_API_KEY", "")
@@ -101,6 +102,7 @@ class GeminiProvider(LLMProvider):
             self.min_interval_s = float(os.environ.get("GEMINI_MIN_INTERVAL", self.min_interval_s))
         except ValueError:
             pass
+        self._dead_combos = set()
         if not self.api_key:
             raise LLMConfigError("GEMINI_API_KEY is not set (get a free key at https://aistudio.google.com)")
 
@@ -151,7 +153,10 @@ class GeminiProvider(LLMProvider):
             except urllib.error.HTTPError as e:
                 code = getattr(e, "code", 0)
                 if code == 429:
+                    # quota wall: one quick retry then rotate (don't burn 14s per dead combo)
                     last_err = LLMRateLimitError(f"gemini 429 rate-limited (attempt {attempt + 1})")
+                    if attempt >= 1:
+                        break
                 elif 500 <= code < 600:
                     last_err = LLMError(f"gemini {code} server error (attempt {attempt + 1})")
                 else:
@@ -173,8 +178,9 @@ class GeminiProvider(LLMProvider):
 
         last_err: Exception | None = None
         tried: list[str] = []
-        for key in self._keys():
-            for model in self._models():
+        combos = [(k, m) for k in self._keys() for m in self._models()]
+        live = [c for c in combos if c not in self._dead_combos] or combos
+        for key, model in live:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
                 body: dict[str, Any] = {
                     "system_instruction": {"parts": [{"text": system}]} if system else None,
@@ -188,6 +194,7 @@ class GeminiProvider(LLMProvider):
                 except LLMRateLimitError as e:
                     last_err = e
                     tried.append(f"{model}/key…{key[-4:]}")
+                    self._dead_combos.add((key, model))  # skip this combo for the rest of the run
                     continue  # rotate key/model on exhausted quota
                 parsed = extract_json(self._parts_text(payload))
                 # cache under the model that actually answered
