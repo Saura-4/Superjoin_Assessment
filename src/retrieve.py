@@ -59,19 +59,25 @@ def find_candidates(
     collection_ids: Optional[list[str]] = None,
     limit: int = 20,
     semantic: Optional[SemanticIndex] = None,
+    pool: Optional[list[dict[str, Any]]] = None,
 ) -> list[dict[str, Any]]:
     """Return at most `limit` related facts. Scope defaults to fact's collection.
 
     Cross-collection comparison only when collection_ids explicitly passed —
-    enabling it never means all-vs-all.
+    enabling it never means all-vs-all. Pass `pool` (prefetched facts) to avoid
+    one SQL scan per fact when relating many facts at once.
     """
-    scope = collection_ids or [fact["collection_id"]]
-    placeholders = ",".join("?" for _ in scope)
-    rows = conn.execute(
-        f"SELECT * FROM facts WHERE collection_id IN ({placeholders}) AND id != ?",
-        (*scope, fact["id"]),
-    ).fetchall()
-    pool = [dict(r) for r in rows]
+    if pool is None:
+        scope = collection_ids or [fact["collection_id"]]
+        placeholders = ",".join("?" for _ in scope)
+        rows = conn.execute(
+            f"SELECT * FROM facts WHERE collection_id IN ({placeholders}) AND id != ?",
+            (*scope, fact["id"]),
+        ).fetchall()
+        pool = [dict(r) for r in rows]
+    else:
+        scope = collection_ids or [fact["collection_id"]]
+        pool = [c for c in pool if c["collection_id"] in scope and c["id"] != fact["id"]]
 
     filtered = [
         c for c in pool

@@ -210,8 +210,15 @@ def relate_new_facts(conn: sqlite3.Connection, provider: LLMProvider, facts: lis
     lookup = evidence_lookup or {}
     out = []
     ambiguous: list[tuple[dict[str, Any], str, dict[str, Any], str]] = []
+    pool: Optional[list[dict[str, Any]]] = None
+    if len(facts) > 3:
+        # one prefetch instead of one SQL scan per fact (heal path is O(n) SQL now)
+        scope = collection_ids or [facts[0]["collection_id"]]
+        placeholders = ",".join("?" for _ in scope)
+        pool = [dict(r) for r in conn.execute(
+            f"SELECT * FROM facts WHERE collection_id IN ({placeholders})", tuple(scope)).fetchall()]
     for fact in facts:
-        for cand in find_candidates(conn, fact, collection_ids):
+        for cand in find_candidates(conn, fact, collection_ids, pool=pool):
             dec = deterministic_decide(fact, cand)
             if dec is None:
                 ambiguous.append((fact, lookup.get(fact["id"], ""), cand, lookup.get(cand["id"], "")))
