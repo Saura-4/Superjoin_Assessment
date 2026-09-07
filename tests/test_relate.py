@@ -101,6 +101,47 @@ def test_relate_unlinked_facts_heals_and_idempotent(tmp_path):
     conn.close()
 
 
+def test_same_doc_ambiguity_needs_no_llm(tmp_path):
+    """Same-document ambiguous pairs resolve UNCERTAIN without spending quota."""
+    from src import relate as rel
+    from src.relate import relate_new_facts
+
+    conn = init_db(tmp_path / "t.db")
+    c1 = create_collection(conn, "c1")
+    d1 = create_document(conn, c1["id"], "a.pdf", "h1")
+    for i in range(2):
+        create_fact(conn, c1["id"], d1["id"], subject="Kapil B", predicate="role",
+                    claim=f"c{i}", value_raw="", value_norm=None, period_norm="FY24")
+
+    class NoLLM(MockProvider):
+        def generate_json(self, prompt, system="", cache_key="", namespace=""):
+            raise AssertionError("LLM must not be called for same-doc ambiguity")
+
+    rels = relate_new_facts(conn, NoLLM(), [
+        dict(r) for r in conn.execute("SELECT * FROM facts").fetchall()], [c1["id"]])
+    assert rels and all(r["type"] == "UNCERTAIN" for r in rels)
+    conn.close()
+
+
+def test_corroboration_bump(tmp_path):
+    from src.relate import relate_new_facts
+    conn = init_db(tmp_path / "t.db")
+    c1 = create_collection(conn, "c1")
+    d1 = create_document(conn, c1["id"], "a.pdf", "h1")
+    d2 = create_document(conn, c1["id"], "b.pdf", "h2")
+    f1 = create_fact(conn, c1["id"], d1["id"], subject="S", predicate="p", claim="c1",
+                     value_raw="10", value_norm=10.0, unit_norm="COUNT", period_norm="FY24",
+                     confidence=0.8)
+    f2 = create_fact(conn, c1["id"], d2["id"], subject="S", predicate="p", claim="c2",
+                     value_raw="10", value_norm=10.0, unit_norm="COUNT", period_norm="FY24",
+                     confidence=0.8)
+    relate_new_facts(conn, MockProvider(), [{**f2, "collection_id": c1["id"]}], [c1["id"]])
+    conns = conn.execute("SELECT confidence FROM facts WHERE id IN (?, ?)",
+                         (f1["id"], f2["id"])).fetchall()
+    assert all(r[0] == 0.85 for r in conns)  # +0.05 each, still below certainty
+    conn.close()
+
+
 def test_different_subjects_never_blind_contradiction():
     from src.relate import deterministic_decide
     a = _fact(subject="Kapil Bharati", predicate="cost", value_norm=35.0,

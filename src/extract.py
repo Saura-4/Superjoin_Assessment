@@ -21,7 +21,30 @@ Rules:
 - Each fact: subject (who/what), predicate (snake_case attribute), value_raw (exact number/text as written, "" if non-numeric), unit_raw, period_raw (e.g. FY24, Q4 FY24, a date, or ""), scope (e.g. consolidated, standalone, services-only, or ""), qualifiers (object, may be {}), claim (one human sentence), confidence (0-1), evidence_quote (verbatim substring from SOURCE, max 400 chars).
 - Only facts stated in SOURCE. Never invent values, periods, or quotes.
 - Prefer meaningful numerical facts (amounts, counts, %, ratios) and key semantic facts (appointments, resignations, addresses, statuses). Skip headers/footers/toc boilerplate.
+- Calibrate confidence honestly: 0.9 = verbatim quote with exact number/period; 0.7 = clear statement but rounded or period inferred; 0.5 or lower = partial/indirect evidence. Never emit 1.0.
 - At most 12 facts. If the page has no meaningful facts, return {"facts": []}."""
+
+CONFIDENCE_CAP_SINGLE_SOURCE = 0.9  # no single-source fact claims certainty; corroboration earns more
+
+
+def recalibrate_confidence(model_conf: float, evidence_quote: str) -> float:
+    """Deterministic confidence: earned by evidence, not asserted by the model.
+
+    - single-source facts are capped below 1.0 (corroboration bumps later);
+    - short/thin quotes lose more (less verifiable context).
+    Pure function so stored facts can be re-scored offline.
+    """
+    try:
+        conf = max(0.0, min(1.0, float(model_conf)))
+    except (TypeError, ValueError):
+        conf = 0.5
+    conf = min(conf, CONFIDENCE_CAP_SINGLE_SOURCE)
+    qlen = len((evidence_quote or "").strip())
+    if qlen < 60:
+        conf -= 0.15
+    elif qlen < 150:
+        conf -= 0.05
+    return round(max(0.05, conf), 3)
 
 MAX_SOURCE_CHARS = 6000
 
@@ -68,6 +91,7 @@ def validate_fact_dict(raw: dict[str, Any], source_text: str) -> dict[str, Any] 
     conf = max(0.0, min(1.0, conf))
     if not quote_grounded(quote, source_text):
         conf *= 0.6  # ungrounded quote → uncertain, never fabricated certainty
+    conf = recalibrate_confidence(conf, quote)
     qual = raw.get("qualifiers", {})
     if not isinstance(qual, dict):
         qual = {}

@@ -10,6 +10,7 @@ from src.extract import (
     extract_facts_from_text,
     persist_facts_with_evidence,
     quote_grounded,
+    recalibrate_confidence,
     validate_fact_dict,
 )
 from src.llm import MockProvider
@@ -22,13 +23,21 @@ def test_quote_grounded():
     assert not quote_grounded("", src)
 
 
+def test_recalibrate_confidence():
+    assert recalibrate_confidence(1.0, "x" * 200) == 0.9  # capped, never certain alone
+    assert recalibrate_confidence(0.9, "x" * 40) == 0.75  # thin quote
+    assert recalibrate_confidence(0.9, "x" * 100) == 0.85
+    assert recalibrate_confidence(0.2, "x" * 200) == 0.2  # low stays low
+    assert recalibrate_confidence("bad", "x" * 200) == 0.5
+
+
 def test_validate_drops_incomplete_and_penalizes_ungrounded():
     src = "Revenue from services was Rs 8,142 crore in FY24."
     good = validate_fact_dict({
         "subject": "Delhivery", "predicate": "revenue_from_services", "value_raw": "Rs 8,142 crore",
         "claim": "Revenue was Rs 8,142 crore in FY24.", "confidence": 0.9,
         "evidence_quote": "Revenue from services was Rs 8,142 crore"}, src)
-    assert good is not None and good["confidence"] == 0.9
+    assert good is not None and good["confidence"] == 0.75  # capped 0.9, short quote -0.15
     bad = validate_fact_dict({
         "subject": "Delhivery", "predicate": "revenue_from_services",
         "claim": "Revenue doubled.", "confidence": 0.9,

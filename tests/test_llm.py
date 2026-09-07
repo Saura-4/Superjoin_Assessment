@@ -108,3 +108,12 @@ def test_gemini_pacing_and_post_split(monkeypatch):
     p.generate_json("hi2", cache_key="")
     assert len(calls) == 2
     assert calls[1] - calls[0] >= 0.04  # paced, not back-to-back
+
+
+def test_cache_namespace_busts_stale_prompts(monkeypatch, tmp_path):
+    from src.llm import GeminiProvider
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy")
+    p = GeminiProvider(cache_dir=str(tmp_path))
+    assert p._cache_path("k") != p._cache_path("k", "judge-v3-qualified")
+    # empty namespace reproduces legacy keys (old extraction cache stays valid)
+    assert p._cache_path("k", "") == p._cache_path("k")

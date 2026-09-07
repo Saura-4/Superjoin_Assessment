@@ -19,6 +19,7 @@ SCALE = {
     "cr": 1e7, "crore": 1e7, "crores": 1e7,
 }
 CURRENCY_TOKENS = {"₹", "inr", "rs", "rs.", "rupee", "rupees"}
+USD_TOKENS = {"$", "usd", "us$", "u.s.", "dollar", "dollars"}
 PERCENT_TOKENS = {"%", "percent", "per cent", "percentage"}
 
 _NUM = r"\(?-?\s*₹?\s*(?:Rs\.?\s*)?\(?-?\d[\d,]*\.?\d*"
@@ -57,6 +58,17 @@ def is_currency(text: str) -> bool:
     return "₹" in (text or "") or any(tok in t for tok in ("inr", "rs", "rupee", "rupees"))
 
 
+def is_usd(text: str) -> bool:
+    if is_currency(text):
+        return False  # INR markers win (e.g. "Rs" mixed text)
+    t = (text or "").lower()
+    if "$" in (text or "") or any(tok in t for tok in ("usd", "us$", "dollar", "dollars")):
+        return True
+    # "US billion/million" (no $ sign): US + explicit scale reads as USD amount
+    words = set(re.split(r"[^a-z0-9$]+", t))
+    return bool({"us", "u.s"} & words) and detect_scale(text) != 1.0
+
+
 def is_percent(text: str) -> bool:
     t = (text or "").lower()
     return "%" in (text or "") or "percent" in t or "per cent" in t
@@ -68,6 +80,8 @@ def canonical_unit(unit_raw: str, value_raw: str = "") -> str:
         return "PERCENT"
     if is_currency(blob):
         return "INR"
+    if is_usd(blob):
+        return "USD"
     u = (unit_raw or "").strip().lower()
     if not u:
         # infer count-like units from value text
@@ -80,6 +94,14 @@ def canonical_unit(unit_raw: str, value_raw: str = "") -> str:
             if key in v:
                 return canon
         return "COUNT"
+    # bare scale words ("million", "US billion") carry no unit meaning — scale is
+    # already folded into value_norm; don't leak them as units.
+    cleaned = re.sub(r"[^a-z ]", "", u).strip()
+    without_scale = re.sub(
+        r"\b(thousands?|millions?|billions?|trillions?|lakhs?|lacs?|crores?|cr|[kmbt]|mn|bn|tn|mm|us|u\.s\.)\b",
+        "", cleaned).strip()
+    if not without_scale:
+        return canonical_unit("", value_raw)
     u = re.sub(r"[^a-z%₹ ]", "", u).strip().upper().replace(" ", "_")
     return u or "COUNT"
 

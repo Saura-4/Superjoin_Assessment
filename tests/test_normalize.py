@@ -57,4 +57,16 @@ def test_fact_dict_enrichment_preserves_raw():
     assert f["value_raw"] == "₹8,142 Cr"  # preserved
     assert f["value_norm"] == 8142 * 1e7
     assert f["period_norm"] == "FY24"
-    assert f["confidence"] == 1.0  # clamped
+    assert f["confidence"] == 1.0  # clamped (recalibration happens in extract.validate)
+
+
+def test_usd_and_bare_scale_units():
+    assert canonical_unit("", "US$ 5 billion deal") == "USD"
+    v, u = normalize_value("US$ 5 billion", "")
+    assert (v, u) == (5_000_000_000.0, "USD")
+    v, u = normalize_value("4.8", "million")
+    assert (v, u) == (4_800_000.0, "COUNT")  # bare scale is not a unit
+    v, u = normalize_value("2", "US billion")
+    assert (v, u) == (2_000_000_000.0, "USD")
+    v, u = normalize_value("₹8,142 Cr", "")
+    assert u == "INR"  # unchanged

@@ -74,7 +74,8 @@ class MockProvider(LLMProvider):
     name: str = "mock"
     canned: Any = None
 
-    def generate_json(self, prompt: str, system: str = "", cache_key: str = "") -> Any:
+    def generate_json(self, prompt: str, system: str = "", cache_key: str = "",
+                      namespace: str = "") -> Any:
         if self.canned is not None:
             return self.canned
         # Generic empty-but-valid extraction shape so pipelines run offline.
@@ -171,8 +172,12 @@ class GeminiProvider(LLMProvider):
                 time.sleep(2 ** attempt * 2)
         raise last_err if last_err else LLMError("gemini request failed")
 
-    def generate_json(self, prompt: str, system: str = "", cache_key: str = "") -> Any:
-        cp = self._cache_path(cache_key or prompt[:2000])
+    def _namespaced(self, cache_key: str, namespace: str) -> str:
+        return f"{namespace}::{cache_key}" if namespace else cache_key
+
+    def generate_json(self, prompt: str, system: str = "", cache_key: str = "",
+                      namespace: str = "") -> Any:
+        cp = self._cache_path(self._namespaced(cache_key or prompt[:2000], namespace))
         if cp is not None and cp.is_file():
             return json.loads(cp.read_text(encoding="utf-8"))
 
@@ -198,7 +203,7 @@ class GeminiProvider(LLMProvider):
                     continue  # rotate key/model on exhausted quota
                 parsed = extract_json(self._parts_text(payload))
                 # cache under the model that actually answered
-                cp = self._cache_path(cache_key or prompt[:2000], model)
+                cp = self._cache_path(self._namespaced(cache_key or prompt[:2000], namespace), model)
                 if cp is not None:
                     cp.parent.mkdir(parents=True, exist_ok=True)
                     cp.write_text(json.dumps(parsed), encoding="utf-8")

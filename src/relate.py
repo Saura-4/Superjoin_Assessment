@@ -21,7 +21,7 @@ REL_TOL = 0.02  # 2% rounding tolerance for cross-document numeric agreement
 
 JUDGE_SYSTEM = """You judge the relationship between two extracted facts.
 Return JSON only: {"type": one of CORROBORATES/CONTRADICTS/RECONCILED/TEMPORAL_CHANGE/UNRELATED/UNCERTAIN, "confidence": 0-1, "reason": "1-2 sentences citing periods/scopes/units"}.
-Rules: same metric+period+scope with equal values (after units) = CORROBORATES. Same metric+period+scope with different values = CONTRADICTS. Same metric but different period granularity/scope/definitions explaining the gap = RECONCILED (name the dimension). Same metric, different time points, changed value = TEMPORAL_CHANGE, not contradiction. Different subjects/entities with different values = UNRELATED, never a contradiction. Differing qualifiers/conditions = RECONCILED or UNRELATED, not CONTRADICTS. Different metrics = UNRELATED. Unclear = UNCERTAIN."""
+Rules: same metric+period+scope with equal values (after units) = CORROBORATES. Same metric+period+scope with different values = CONTRADICTS. Same metric but different period granularity/scope/definitions explaining the gap = RECONCILED (name the dimension). Same metric, different time points, changed value = TEMPORAL_CHANGE, not contradiction. Different subjects/entities with different values = UNRELATED, never a contradiction. Differing qualifiers/conditions = RECONCILED or UNRELATED, not CONTRADICTS. Different metrics = UNRELATED. Unclear = UNCERTAIN. Calibrate confidence: 0.9 only for exact agreement/disagreement on precise numbers; 0.6-0.7 for rounded or textually inferred pairs; never 1.0."""
 
 
 def values_equal(v1: Optional[float], v2: Optional[float], tol: float = REL_TOL) -> Optional[bool]:
@@ -137,11 +137,12 @@ def llm_judge(provider: LLMProvider, a: dict[str, Any], ev_a: str,
 
 def llm_judge_batch(provider: LLMProvider,
                      pairs: list[tuple[dict[str, Any], str, dict[str, Any], str]],
-                     chunk: int = 8) -> list[dict[str, Any]]:
+                     chunk: int = 5) -> list[dict[str, Any]]:
     """Judge many ambiguous pairs in few LLM calls (quota-friendly).
 
     One call per `chunk` pairs; malformed chunk responses degrade to UNCERTAIN
     per pair (no quota-burning retries). Empty input → [].
+    Small chunks: lite models drop entries from oversized batches.
     """
     decisions: list[dict[str, Any]] = []
     for i in range(0, len(pairs), chunk):
@@ -162,7 +163,8 @@ def _judge_chunk(provider: LLMProvider, pairs: list[tuple[dict[str, Any], str, d
                 " with exactly one entry per pair, same order.")
     try:
         out = provider.generate_json(prompt, system=JUDGE_SYSTEM,
-                                     cache_key=f"judge-batch-v2:{pairs[0][0]['id']}:{len(pairs)}")
+                                     cache_key=f"judge-batch:{pairs[0][0]['id']}:{len(pairs)}",
+                                     namespace="judge-v3-qualified")
     except LLMError:
         return [uncertain("LLM unavailable; marked uncertain.") for _ in pairs]
     decs = out.get("decisions", []) if isinstance(out, dict) else []
@@ -221,8 +223,17 @@ def relate_new_facts(conn: sqlite3.Connection, provider: LLMProvider, facts: lis
         for cand in find_candidates(conn, fact, collection_ids, pool=pool):
             dec = deterministic_decide(fact, cand)
             if dec is None:
-                ambiguous.append((fact, lookup.get(fact["id"], ""), cand, lookup.get(cand["id"], "")))
-            elif dec["type"] != "UNRELATED":
+                # LLM judgment is reserved for cross-document ambiguity: within one
+                # disclosure, distinct facts are noise to a knowledge layer, and
+                # judging them burns quota for UNCERTAIN verdicts.
+                if cand.get("document_id") == fact.get("document_id"):
+                    dec = {"type": "UNCERTAIN", "confidence": 0.3,
+                           "reason": "Same-document ambiguity without cross-doc evidence; left uncertain.",
+                           "dimensions": {}}
+                else:
+                    ambiguous.append((fact, lookup.get(fact["id"], ""), cand, lookup.get(cand["id"], "")))
+                    continue
+            if dec["type"] != "UNRELATED":
                 out.append(create_relationship(conn, fact["collection_id"], fact["id"], cand["id"],
                                                dec["type"], dec.get("confidence", 0.5),
                                                dec.get("reason", ""), dec.get("dimensions", {})))
@@ -234,7 +245,23 @@ def relate_new_facts(conn: sqlite3.Connection, provider: LLMProvider, facts: lis
             out.append(create_relationship(conn, fact["collection_id"], fact["id"], cand["id"],
                                            dec["type"], dec.get("confidence", 0.5),
                                            dec.get("reason", ""), dec.get("dimensions", {})))
+    _bump_corroborated(conn, out)
     return out
+
+
+def _bump_corroborated(conn: sqlite3.Connection, rels: list[dict[str, Any]]) -> None:
+    """Corroboration earns confidence: facts confirmed by an independent source
+    get +0.05 capped at 0.95. Single-source facts never reach certainty alone."""
+    seen: set[str] = set()
+    for r in rels:
+        if r.get("type") == "CORROBORATES":
+            seen.add(r["fact_a_id"])
+            seen.add(r["fact_b_id"])
+    for fid in seen:
+        conn.execute(
+            "UPDATE facts SET confidence = min(0.95, round(confidence + 0.05, 3)) WHERE id = ?", (fid,))
+    if seen:
+        conn.commit()
 
 
 def relate_unlinked_facts(conn: sqlite3.Connection, provider: LLMProvider,
