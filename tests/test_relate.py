@@ -109,7 +109,7 @@ def test_different_subjects_never_blind_contradiction():
     b = _fact(subject="CA Swift Investments", predicate="cost", value_norm=139.0,
               unit_norm="INR", period_norm="FY24", scope="",
               qualifiers={})
-    assert deterministic_decide(a, b) is None  # needs LLM, must not CONTRADICT
+    assert deterministic_decide(a, b)["type"] == "UNRELATED"  # zero shared terms, different values
 
 
 def test_differing_qualifiers_need_judgment():

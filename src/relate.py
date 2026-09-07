@@ -57,12 +57,31 @@ def _quals(f: dict[str, Any]) -> dict[str, Any]:
     return q if isinstance(q, dict) else {}
 
 
+def _zero_overlap(a: str, b: str) -> bool:
+    import re as _re
+    ta = set(t for t in _re.split(r"[^a-z0-9]+", (a or "").lower()) if t)
+    tb = set(t for t in _re.split(r"[^a-z0-9]+", (b or "").lower()) if t)
+    return bool(ta and tb) and not (ta & tb)
+
+
 def deterministic_decide(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any] | None:
     """Return decision dict or None when genuinely ambiguous (needs LLM)."""
     if a.get("predicate") != b.get("predicate"):
         return None  # predicate semantics need judgment
-    if not subject_compatible(a.get("subject", ""), b.get("subject", "")):
-        return None  # different entities (e.g. two shareholders' costs) — never a blind contradiction
+    if _zero_overlap(a.get("subject", ""), b.get("subject", "")):
+        va, vb = a.get("value_norm"), b.get("value_norm")
+        if va is not None and vb is not None and values_equal(va, vb) is not True:
+            # wholly distinct entities, different values: different facts, not a fight
+            return {"type": "UNRELATED", "confidence": 0.85,
+                    "reason": "Different subjects with no shared terms and different values; unrelated facts.",
+                    "dimensions": {}}
+        if va is None or vb is None:
+            return {"type": "UNRELATED", "confidence": 0.7,
+                    "reason": "Different subjects with no shared terms; unrelated facts.",
+                    "dimensions": {}}
+        # equal values despite different names: fall through (possible alias/corroboration)
+    elif not subject_compatible(a.get("subject", ""), b.get("subject", "")):
+        return None  # partially overlapping entities — needs judgment, never a blind contradiction
     if _quals(a) and _quals(b) and _quals(a) != _quals(b):
         return None  # differing conditions/qualifiers need judgment, not a numeric verdict
     pa, pb = a.get("period_norm") or "", b.get("period_norm") or ""
