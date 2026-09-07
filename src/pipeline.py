@@ -29,7 +29,7 @@ from src.db import (
 from src.extract import extract_facts_from_text, persist_facts_with_evidence
 from src.ingest import ingest_pdf, load_cached_page_text
 from src.llm import LLMProvider
-from src.relate import relate_new_fact
+from src.relate import relate_new_facts
 
 RESUMABLE_STATUSES = {"extracted", "low_text", "pending", "failed"}
 
@@ -105,6 +105,7 @@ def process_document(
     scope_ids = resolve_scope(conn, collection_id, scope)
     facts_added, rels_added, failures = 0, 0, []
     evidence_lookup: dict[str, str] = {}
+    new_rows: list[dict[str, Any]] = []
 
     for p in pages:
         page_no, text, quality = p["page"], p["text"], p.get("quality", "unknown")
@@ -136,14 +137,13 @@ def process_document(
         upsert_page_status(conn, doc["id"], page_no, status="processed",
                            attempts=1, text_len=len(text), quality=quality)
         facts_added += len(rows)
-        for r in rows:
-            rels = relate_new_fact(conn, provider, r, collection_ids=scope_ids,
-                                   evidence_lookup=evidence_lookup)
-            rels_added += len(rels)
-            for rel in rels:
-                for fid in (rel["fact_a_id"], rel["fact_b_id"]):
-                    if fid not in evidence_lookup:
-                        evidence_lookup[fid] = ""
+        new_rows.extend(rows)
+
+    # relate once per document: deterministic first, ambiguous judged in batches
+    if new_rows:
+        rels = relate_new_facts(conn, provider, new_rows, collection_ids=scope_ids,
+                                evidence_lookup=evidence_lookup)
+        rels_added = len(rels)
 
     update_document_status(conn, doc["id"], "ready")
     update_job(conn, job["id"], "done")

@@ -63,6 +63,29 @@ def test_ambiguous_goes_to_llm_mock():
     assert out["type"] == "UNCERTAIN"  # mock judge
 
 
+def test_batch_judge_empty_and_mock_shape():
+    from src.relate import llm_judge_batch
+    assert llm_judge_batch(MockProvider(), []) == []
+    a = _fact(value_norm=None, period_norm="FY22")
+    b = _fact(value_norm=None, period_norm="FY24")
+    out = llm_judge_batch(MockProvider(), [(a, "ev a", b, "ev b")] * 3)
+    assert len(out) == 3 and all(d["type"] == "UNCERTAIN" for d in out)  # mock lacks decisions shape
+
+
+def test_relate_new_facts_batches(tmp_path):
+    from src.relate import relate_new_facts
+    conn = init_db(tmp_path / "t.db")
+    c1 = create_collection(conn, "c1")
+    d1 = create_document(conn, c1["id"], "a.pdf", "h1")
+    f1 = create_fact(conn, c1["id"], d1["id"], subject="S", predicate="p",
+                     claim="c1", value_raw="10", value_norm=10.0, unit_norm="COUNT", period_norm="FY24")
+    f2 = create_fact(conn, c1["id"], d1["id"], subject="S", predicate="p",
+                     claim="c2", value_raw="10", value_norm=10.0, unit_norm="COUNT", period_norm="FY24")
+    rels = relate_new_facts(conn, MockProvider(), [{**f2, "collection_id": c1["id"]}])
+    assert any(r["type"] == "CORROBORATES" for r in rels)
+    conn.close()
+
+
 def test_retrieval_selective_and_scoped(tmp_path):
     conn = init_db(tmp_path / "t.db")
     c1 = create_collection(conn, "delhivery")

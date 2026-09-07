@@ -98,24 +98,54 @@ def deterministic_decide(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]
 
 def llm_judge(provider: LLMProvider, a: dict[str, Any], ev_a: str,
               b: dict[str, Any], ev_b: str) -> dict[str, Any]:
-    prompt = ("RELATION JUDGE. Fact A:\n" + json.dumps(_slim(a), indent=1)
-              + f"\nEvidence A: {ev_a[:600]}\n\nFact B:\n" + json.dumps(_slim(b), indent=1)
-              + f"\nEvidence B: {ev_b[:600]}\n\nReturn JSON.")
+    out = llm_judge_batch(provider, [(a, ev_a, b, ev_b)])
+    return out[0]
+
+
+def llm_judge_batch(provider: LLMProvider,
+                     pairs: list[tuple[dict[str, Any], str, dict[str, Any], str]],
+                     chunk: int = 8) -> list[dict[str, Any]]:
+    """Judge many ambiguous pairs in few LLM calls (quota-friendly).
+
+    One call per `chunk` pairs; malformed chunk responses degrade to UNCERTAIN
+    per pair (no quota-burning retries). Empty input → [].
+    """
+    decisions: list[dict[str, Any]] = []
+    for i in range(0, len(pairs), chunk):
+        decisions.extend(_judge_chunk(provider, pairs[i:i + chunk]))
+    return decisions
+
+
+def _judge_chunk(provider: LLMProvider, pairs: list[tuple[dict[str, Any], str, dict[str, Any], str]]) -> list[dict[str, Any]]:
+    def uncertain(reason: str) -> dict[str, Any]:
+        return {"type": "UNCERTAIN", "confidence": 0.3, "reason": reason, "dimensions": {}}
+
+    body = []
+    for n, (a, ev_a, b, ev_b) in enumerate(pairs):
+        body.append(f"--- PAIR {n} ---\nFact A: {json.dumps(_slim(a))}\nEvidence A: {ev_a[:500]}"
+                    f"\nFact B: {json.dumps(_slim(b))}\nEvidence B: {ev_b[:500]}")
+    prompt = ("RELATION JUDGE. Decide each pair independently.\n" + "\n".join(body)
+              + '\n\nReturn JSON: {"decisions": [{"type": ..., "confidence": 0-1, "reason": "..."}]}'
+                " with exactly one entry per pair, same order.")
     try:
         out = provider.generate_json(prompt, system=JUDGE_SYSTEM,
-                                     cache_key=f"judge:{a['id']}:{b['id']}")
+                                     cache_key=f"judge-batch:{pairs[0][0]['id']}:{len(pairs)}")
     except LLMError:
-        return {"type": "UNCERTAIN", "confidence": 0.3, "reason": "LLM unavailable; marked uncertain.", "dimensions": {}}
-    if not isinstance(out, dict):
-        return {"type": "UNCERTAIN", "confidence": 0.3, "reason": "Bad judge output; marked uncertain.", "dimensions": {}}
-    t = str(out.get("type", "UNCERTAIN")).upper()
-    if t not in REL_TYPES:
-        t = "UNCERTAIN"
-    try:
-        conf = max(0.0, min(1.0, float(out.get("confidence", 0.5))))
-    except (TypeError, ValueError):
-        conf = 0.5
-    return {"type": t, "confidence": conf, "reason": str(out.get("reason", ""))[:500], "dimensions": {}}
+        return [uncertain("LLM unavailable; marked uncertain.") for _ in pairs]
+    decs = out.get("decisions", []) if isinstance(out, dict) else []
+    result = []
+    for n in range(len(pairs)):
+        d = decs[n] if n < len(decs) and isinstance(decs[n], dict) else {}
+        t = str(d.get("type", "UNCERTAIN")).upper()
+        if t not in REL_TYPES:
+            t = "UNCERTAIN"
+        try:
+            conf = max(0.0, min(1.0, float(d.get("confidence", 0.5))))
+        except (TypeError, ValueError):
+            conf = 0.5
+        result.append({"type": t, "confidence": conf,
+                       "reason": str(d.get("reason", ""))[:500], "dimensions": {}})
+    return result
 
 
 def _slim(f: dict[str, Any]) -> dict[str, Any]:
@@ -134,15 +164,32 @@ def relate_pair(provider: LLMProvider, a: dict[str, Any], b: dict[str, Any],
 def relate_new_fact(conn: sqlite3.Connection, provider: LLMProvider, fact: dict[str, Any],
                     collection_ids: Optional[list[str]] = None,
                     evidence_lookup: Optional[dict[str, str]] = None) -> list[dict[str, Any]]:
-    """Find candidates for one new fact, decide + persist non-UNRELATED links."""
+    """Single-fact wrapper (kept for tests/callers); prefer relate_new_facts for batches."""
+    return relate_new_facts(conn, provider, [fact], collection_ids, evidence_lookup)
+
+
+def relate_new_facts(conn: sqlite3.Connection, provider: LLMProvider, facts: list[dict[str, Any]],
+                     collection_ids: Optional[list[str]] = None,
+                     evidence_lookup: Optional[dict[str, str]] = None) -> list[dict[str, Any]]:
+    """Deterministic decisions for all pairs first; ambiguous pairs judged in batches."""
+    lookup = evidence_lookup or {}
     out = []
-    for cand in find_candidates(conn, fact, collection_ids):
-        dec = relate_pair(provider, fact, cand,
-                          (evidence_lookup or {}).get(fact["id"], ""),
-                          (evidence_lookup or {}).get(cand["id"], ""))
-        if dec["type"] == "UNRELATED":
-            continue
-        out.append(create_relationship(conn, fact["collection_id"], fact["id"], cand["id"],
-                                       dec["type"], dec.get("confidence", 0.5),
-                                       dec.get("reason", ""), dec.get("dimensions", {})))
+    ambiguous: list[tuple[dict[str, Any], str, dict[str, Any], str]] = []
+    for fact in facts:
+        for cand in find_candidates(conn, fact, collection_ids):
+            dec = deterministic_decide(fact, cand)
+            if dec is None:
+                ambiguous.append((fact, lookup.get(fact["id"], ""), cand, lookup.get(cand["id"], "")))
+            elif dec["type"] != "UNRELATED":
+                out.append(create_relationship(conn, fact["collection_id"], fact["id"], cand["id"],
+                                               dec["type"], dec.get("confidence", 0.5),
+                                               dec.get("reason", ""), dec.get("dimensions", {})))
+    if ambiguous:
+        judged = llm_judge_batch(provider, ambiguous)
+        for (fact, _, cand, _), dec in zip(ambiguous, judged):
+            if dec["type"] == "UNRELATED":
+                continue
+            out.append(create_relationship(conn, fact["collection_id"], fact["id"], cand["id"],
+                                           dec["type"], dec.get("confidence", 0.5),
+                                           dec.get("reason", ""), dec.get("dimensions", {})))
     return out
