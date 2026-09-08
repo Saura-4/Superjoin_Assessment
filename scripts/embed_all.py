@@ -1,17 +1,14 @@
-"""Embed all remaining facts, quota split 50/50 across two keys (local-only).
+"""Embed remaining facts, quota split across live keys (local-only).
 
-First half of the missing set goes through GEMINI_API_KEY, second half through
-GEMINI_API_KEY2, each with its own thread pool (parallel requests, single
-SQLite writer thread). Resume-safe via text_hash: already-embedded facts are
-skipped. Model fixed to gemini-embedding-2.
-
-Usage: python scripts/embed_all.py [--db ...] [--workers 3]
+Each live key embeds at most --per-key facts (default 200). Parallel requests
+per key, single SQLite writer. Resume-safe via text_hash. Model fixed.
+Usage: python scripts/embed_all.py [--db ...] [--workers 2] [--per-key 200]
 """
 import argparse
 import hashlib
 import os
 import sys
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -61,13 +58,32 @@ def live_keys(keys):
 
 
 def run_half(embedder, jobs, workers):
-    done = []
+    """Parallel embeds; one bad future never kills the batch (logged, skipped)."""
+    done, failed = [], 0
     with ThreadPoolExecutor(max_workers=workers) as ex:
         futs = {ex.submit(embedder.embed, [txt]): (fid, th) for fid, txt, th in jobs}
-        for fut in futs:
+        for fut in as_completed(futs):
             fid, th = futs[fut]
-            done.append((fid, fut.result()[0], th))
+            try:
+                done.append((fid, fut.result()[0], th))
+            except Exception as e:
+                failed += 1
+                print(f"  ! {fid[:6]} failed: {str(e)[:100]}", flush=True)
+    if failed:
+        print(f"  {failed} failed, {len(done)} ok", flush=True)
     return done
+
+
+def read_keys(env):
+    keys = [env.get("GEMINI_API_KEY", ""), env.get("GEMINI_API_KEY2", ""),
+            env.get("GEMINI_API_KEY3", "")]
+    for k in env.get("GEMINI_API_KEYS", "").split(","):
+        keys.append(k.strip())
+    seen = []
+    for k in keys:
+        if k and k not in seen:
+            seen.append(k)
+    return seen
 
 
 def main():
@@ -76,9 +92,11 @@ def main():
     ap.add_argument("--workers", type=int, default=2)
     ap.add_argument("--limit", type=int, default=None,
                     help="cap new embeddings this run (quota budgeting)")
+    ap.add_argument("--per-key", type=int, default=200,
+                    help="max facts per live key this run")
     args = ap.parse_args()
     env = load_env(".env")
-    keys = live_keys([env.get("GEMINI_API_KEY", ""), env.get("GEMINI_API_KEY2", "")])
+    keys = live_keys(read_keys(env))
     if not keys:
         print("no live embedding keys; try again after quota reset")
         return 2
@@ -86,11 +104,11 @@ def main():
     todo = missing(conn, EMBEDDING_MODEL)
     if args.limit is not None:
         todo = todo[:args.limit]
-    print(f"missing embeddings: {len(todo)} (capped)" if args.limit else f"missing embeddings: {len(todo)}", flush=True)
-    # split remaining work across live keys only
+    print(f"missing: {len(todo)}, live keys: {len(keys)}, per-key cap: {args.per_key}", flush=True)
+    # round-robin split across live keys only
     chunks = [todo[i::len(keys)] for i in range(len(keys))]
     # safe pacing: 2 workers x 2.5s ~= 48/min, well under the 100 RPM ceiling
-    parts = [(GeminiEmbedder(api_key=k, min_interval_s=2.5), jobs)
+    parts = [(GeminiEmbedder(api_key=k, min_interval_s=2.5), jobs[:args.per_key])
              for k, jobs in zip(keys, chunks)]
     total = 0
     for emb, jobs in parts:
