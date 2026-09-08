@@ -224,15 +224,13 @@ def relate_new_facts(conn: sqlite3.Connection, provider: LLMProvider, facts: lis
             dec = deterministic_decide(fact, cand)
             if dec is None:
                 # LLM judgment is reserved for cross-document ambiguity: within one
-                # disclosure, distinct facts are noise to a knowledge layer, and
-                # judging them burns quota for UNCERTAIN verdicts.
+                # disclosure, distinct facts are noise to a knowledge layer.
+                # Same-doc ambiguity is skipped entirely (no LLM, no row) — the
+                # deterministic pass already settled everything decidable.
                 if cand.get("document_id") == fact.get("document_id"):
-                    dec = {"type": "UNCERTAIN", "confidence": 0.3,
-                           "reason": "Same-document ambiguity without cross-doc evidence; left uncertain.",
-                           "dimensions": {}}
-                else:
-                    ambiguous.append((fact, lookup.get(fact["id"], ""), cand, lookup.get(cand["id"], "")))
                     continue
+                ambiguous.append((fact, lookup.get(fact["id"], ""), cand, lookup.get(cand["id"], "")))
+                continue
             if dec["type"] != "UNRELATED":
                 out.append(create_relationship(conn, fact["collection_id"], fact["id"], cand["id"],
                                                dec["type"], dec.get("confidence", 0.5),

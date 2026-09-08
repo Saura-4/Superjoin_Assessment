@@ -119,7 +119,7 @@ def test_same_doc_ambiguity_needs_no_llm(tmp_path):
 
     rels = relate_new_facts(conn, NoLLM(), [
         dict(r) for r in conn.execute("SELECT * FROM facts").fetchall()], [c1["id"]])
-    assert rels and all(r["type"] == "UNCERTAIN" for r in rels)
+    assert rels == []  # same-doc ambiguity skipped: no LLM, no rows
     conn.close()
 
 
