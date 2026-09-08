@@ -45,6 +45,21 @@ def missing(conn, model):
     return todo
 
 
+def live_keys(keys):
+    """Probe each key once; drop 429-dead ones instead of burning retries on them."""
+    live = []
+    for k in keys:
+        if not k:
+            continue
+        try:
+            GeminiEmbedder(api_key=k, min_interval_s=0).embed(["Subject: probe"])
+            live.append(k)
+            print(f"key…{k[-4:]}: alive", flush=True)
+        except Exception as e:
+            print(f"key…{k[-4:]}: dead ({str(e)[:80]}), skipped", flush=True)
+    return live
+
+
 def run_half(embedder, jobs, workers):
     done = []
     with ThreadPoolExecutor(max_workers=workers) as ex:
@@ -61,17 +76,18 @@ def main():
     ap.add_argument("--workers", type=int, default=3)
     args = ap.parse_args()
     env = load_env(".env")
-    k1, k2 = env.get("GEMINI_API_KEY", ""), env.get("GEMINI_API_KEY2", "")
-    if not k1 or not k2:
-        print("need both GEMINI_API_KEY and GEMINI_API_KEY2 in .env")
+    keys = live_keys([env.get("GEMINI_API_KEY", ""), env.get("GEMINI_API_KEY2", "")])
+    if not keys:
+        print("no live embedding keys; try again after quota reset")
         return 2
     conn = init_db(args.db)
     todo = missing(conn, EMBEDDING_MODEL)
     print(f"missing embeddings: {len(todo)}", flush=True)
-    half = (len(todo) + 1) // 2
+    # split remaining work across live keys only
+    chunks = [todo[i::len(keys)] for i in range(len(keys))]
     # 0.6s effective per key: 3 workers x 1.8s pacing ~= 100 RPM quota
-    parts = [(GeminiEmbedder(api_key=k1, min_interval_s=1.8), todo[:half]),
-             (GeminiEmbedder(api_key=k2, min_interval_s=1.8), todo[half:])]
+    parts = [(GeminiEmbedder(api_key=k, min_interval_s=1.8), jobs)
+             for k, jobs in zip(keys, chunks)]
     total = 0
     for emb, jobs in parts:
         if not jobs:
