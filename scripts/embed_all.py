@@ -73,7 +73,9 @@ def run_half(embedder, jobs, workers):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--db", default="data/run_delhivery.db")
-    ap.add_argument("--workers", type=int, default=3)
+    ap.add_argument("--workers", type=int, default=2)
+    ap.add_argument("--limit", type=int, default=None,
+                    help="cap new embeddings this run (quota budgeting)")
     args = ap.parse_args()
     env = load_env(".env")
     keys = live_keys([env.get("GEMINI_API_KEY", ""), env.get("GEMINI_API_KEY2", "")])
@@ -82,11 +84,13 @@ def main():
         return 2
     conn = init_db(args.db)
     todo = missing(conn, EMBEDDING_MODEL)
-    print(f"missing embeddings: {len(todo)}", flush=True)
+    if args.limit is not None:
+        todo = todo[:args.limit]
+    print(f"missing embeddings: {len(todo)} (capped)" if args.limit else f"missing embeddings: {len(todo)}", flush=True)
     # split remaining work across live keys only
     chunks = [todo[i::len(keys)] for i in range(len(keys))]
-    # 0.6s effective per key: 3 workers x 1.8s pacing ~= 100 RPM quota
-    parts = [(GeminiEmbedder(api_key=k, min_interval_s=1.8), jobs)
+    # safe pacing: 2 workers x 2.5s ~= 48/min, well under the 100 RPM ceiling
+    parts = [(GeminiEmbedder(api_key=k, min_interval_s=2.5), jobs)
              for k, jobs in zip(keys, chunks)]
     total = 0
     for emb, jobs in parts:
