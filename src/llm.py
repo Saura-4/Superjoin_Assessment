@@ -24,6 +24,13 @@ class LLMError(Exception):
     pass
 
 
+BROWSER_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+              "AppleWebKit/537.36 (KHTML, like Gecko) "
+              "Chrome/126.0.0.0 Safari/537.36")
+"""Non-library User-Agent: Cloudflare-fronted APIs (e.g. Cerebras) answer
+Python's default UA with 403 + `error code: 1010` before auth. Harmless elsewhere."""
+
+
 class LLMConfigError(LLMError):
     pass
 
@@ -133,7 +140,9 @@ class GeminiProvider(LLMProvider):
         return ms
 
     def _post(self, url: str, data: bytes) -> dict[str, Any]:
-        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json",
+                                                               "User-Agent": BROWSER_UA,
+                                                               "Accept": "application/json"})
         with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
             return json.loads(resp.read().decode())
 
