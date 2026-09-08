@@ -53,7 +53,7 @@ def test_gemini_rotation_on_429(monkeypatch):
     p = GeminiProvider(cache_dir=None, max_retries=1)
     seen_urls: list[str] = []
 
-    def fake_post(url, data):
+    def fake_post(url, data, key=""):
         seen_urls.append(url)
         if "3.1-flash-lite" in url:
             raise urllib.error.HTTPError(url, 429, "too many", {}, io.BytesIO(b"{}"))
@@ -77,7 +77,7 @@ def test_gemini_second_key_picked_up_live(monkeypatch):
     p = GeminiProvider(cache_dir=None, max_retries=1)
     seen: list[str] = []
 
-    def fake_post(url, data):
+    def fake_post(url, data, key=""):
         seen.append(url)
         if "key-one" in url:
             raise urllib.error.HTTPError(url, 429, "slow down", {}, io.BytesIO(b"{}"))
@@ -99,7 +99,7 @@ def test_gemini_pacing_and_post_split(monkeypatch):
     p = GeminiProvider(cache_dir=None)
     calls: list[float] = []
 
-    def fake_post(url, data):
+    def fake_post(url, data, key=""):
         calls.append(time.time())
         return {"candidates": [{"content": {"parts": [{"text": '{"ok": 1}'}]}}]}
 
@@ -117,3 +117,71 @@ def test_cache_namespace_busts_stale_prompts(monkeypatch, tmp_path):
     assert p._cache_path("k") != p._cache_path("k", "judge-v3-qualified")
     # empty namespace reproduces legacy keys (old extraction cache stays valid)
     assert p._cache_path("k", "") == p._cache_path("k")
+
+
+def _groq(monkeypatch):
+    from src.llm import GroqProvider
+    monkeypatch.setenv("GROQ_API_KEY", "gsk-test")
+    monkeypatch.setenv("GROQ_FALLBACK_MODELS", "")
+    monkeypatch.setenv("GROQ_MIN_INTERVAL", "0")
+    return GroqProvider(cache_dir=None, max_retries=1)
+
+
+def test_groq_body_endpoint_auth(monkeypatch):
+    from src.llm import GroqProvider
+    p = _groq(monkeypatch)
+    assert p._endpoint("k", "m") == "https://api.groq.com/openai/v1/chat/completions"
+    assert p._auth_header("k") == {"Authorization": "Bearer k"}
+    body = p._request_body("do it", "sys", "llama-3.3-70b-versatile")
+    assert body["model"] == "llama-3.3-70b-versatile"
+    assert body["response_format"] == {"type": "json_object"}
+    assert [m["role"] for m in body["messages"]] == ["system", "user"]
+    assert GroqProvider._parts_text(
+        {"choices": [{"message": {"content": '{"a": 1}'}}]}) == '{"a": 1}'
+    assert GroqProvider._parts_text({}) == ""
+
+
+def test_groq_json_roundtrip_and_401_fails_fast(monkeypatch):
+    import io
+    import json
+    import urllib.error
+
+    p = _groq(monkeypatch)
+    seen = []
+
+    def fake_post(url, data, key=""):
+        seen.append((url, json.loads(data), key))
+        return {"choices": [{"message": {"content": '{"ok": 9}'}}]}
+
+    p._post = fake_post  # type: ignore[method-assign]
+    assert p.generate_json("hi", system="sys", cache_key="") == {"ok": 9}
+    url, body, key = seen[0]
+    assert "groq.com" in url and key == "gsk-test"
+    assert body["model"] == "llama-3.3-70b-versatile"
+
+    def bad_key(url, data, key=""):
+        raise urllib.error.HTTPError(url, 401, "bad key", {}, io.BytesIO(b"{}"))
+
+    p._post = bad_key  # type: ignore[method-assign]
+    import pytest as _pt
+    with _pt.raises(Exception):
+        p.generate_json("hi2", cache_key="")
+
+
+def test_groq_missing_key(monkeypatch):
+    from src.llm import GroqProvider, LLMConfigError
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    try:
+        GroqProvider(api_key="")
+        raise AssertionError("should have raised")
+    except LLMConfigError:
+        pass
+
+
+def test_factory_groq(monkeypatch):
+    from src.llm import GroqProvider, MockProvider, get_provider
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setenv("GROQ_API_KEY", "gsk-test")
+    assert isinstance(get_provider("groq"), GroqProvider)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    assert isinstance(get_provider(), MockProvider)

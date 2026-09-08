@@ -2,43 +2,27 @@
  "model": "gemini-3.1-flash-lite",
  "docs": [
   {
-   "file": "03-delhivery-q4-fy24-earnings-presentation.pdf",
-   "seconds": 586.2,
-   "pages": 27,
-   "duplicate": false,
-   "facts_added": 184,
-   "relationships_added": 450,
-   "failures": [
-    {
-     "page": 2,
-     "kind": "extraction_failure",
-     "detail": "no extractable text layer (chart/scan?); no facts fabricated"
-    },
-    {
-     "page": 4,
-     "kind": "extraction_failure",
-     "detail": "no extractable text layer (chart/scan?); no facts fabricated"
-    },
-    {
-     "page": 18,
-     "kind": "extraction_failure",
-     "detail": "no extractable text layer (chart/scan?); no facts fabricated"
-    }
-   ]
+   "file": "02-delhivery-annual-report-fy24-excerpt.pdf",
+   "seconds": 161.3,
+   "pages": 100,
+   "duplicate": true,
+   "facts_added": 0,
+   "relationships_added": 14,
+   "failures": []
   }
  ],
- "started": 1788870810.6190948,
- "total_seconds": 586.2,
+ "started": 1788871972.7143586,
+ "total_seconds": 161.3,
  "collection": {
   "documents": 3,
   "facts": 1652,
-  "relationships": 629
+  "relationships": 572
  },
  "relationships_by_type": {
-  "CORROBORATES": 122,
-  "RECONCILED": 118,
-  "TEMPORAL_CHANGE": 229,
-  "CONTRADICTS": 145,
-  "UNCERTAIN": 15
+  "CORROBORATES": 100,
+  "RECONCILED": 104,
+  "TEMPORAL_CHANGE": 226,
+  "CONTRADICTS": 130,
+  "UNCERTAIN": 12
  }
 }

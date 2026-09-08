@@ -139,19 +139,35 @@ class GeminiProvider(LLMProvider):
                 ms.append(m)
         return ms
 
-    def _post(self, url: str, data: bytes) -> dict[str, Any]:
-        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json",
-                                                               "User-Agent": BROWSER_UA,
-                                                               "Accept": "application/json"})
+    def _endpoint(self, key: str, model: str) -> str:
+        return f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+
+    def _request_body(self, prompt: str, system: str, model: str) -> dict[str, Any]:
+        body: dict[str, Any] = {
+            "system_instruction": {"parts": [{"text": system}]} if system else None,
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"response_mime_type": "application/json", "temperature": 0.1},
+        }
+        return {k: v for k, v in body.items() if v is not None}
+
+    def _post(self, url: str, data: bytes, key: str = "") -> dict[str, Any]:
+        headers = {"Content-Type": "application/json",
+                   "User-Agent": BROWSER_UA,
+                   "Accept": "application/json"}
+        headers.update(self._auth_header(key))
+        req = urllib.request.Request(url, data=data, headers=headers)
         with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
             return json.loads(resp.read().decode())
+
+    def _auth_header(self, key: str) -> dict[str, str]:
+        return {}  # Gemini passes the key in the URL; override for header-auth APIs
 
     @staticmethod
     def _parts_text(payload: dict[str, Any]) -> str:
         parts = payload.get("candidates", [{}])[0].get("content", {}).get("parts", [])
         return "".join(p.get("text", "") for p in parts)
 
-    def _request_with_retry(self, url: str, data: bytes) -> dict[str, Any]:
+    def _request_with_retry(self, url: str, data: bytes, key: str = "") -> dict[str, Any]:
         last_err: Exception | None = None
         for attempt in range(self.max_retries):
             try:
@@ -159,27 +175,27 @@ class GeminiProvider(LLMProvider):
                 if gap < self.min_interval_s:
                     time.sleep(self.min_interval_s - gap)
                 self._last_call = time.time()
-                return self._post(url, data)
+                return self._post(url, data, key)
             except urllib.error.HTTPError as e:
                 code = getattr(e, "code", 0)
                 if code == 429:
                     # quota wall: one quick retry then rotate (don't burn 14s per dead combo)
-                    last_err = LLMRateLimitError(f"gemini 429 rate-limited (attempt {attempt + 1})")
+                    last_err = LLMRateLimitError(f"{self.name} 429 rate-limited (attempt {attempt + 1})")
                     if attempt >= 1:
                         break
                 elif 500 <= code < 600:
-                    last_err = LLMError(f"gemini {code} server error (attempt {attempt + 1})")
+                    last_err = LLMError(f"{self.name} {code} server error (attempt {attempt + 1})")
                 else:
                     try:
                         detail = e.read().decode()[:500]
                     except Exception:
                         detail = ""
-                    raise LLMError(f"gemini HTTP {code}: {detail}")
+                    raise LLMError(f"{self.name} HTTP {code}: {detail}")
                 time.sleep(2 ** attempt * 2)
             except (LLMError, TimeoutError, ConnectionError, OSError) as e:
                 last_err = e
                 time.sleep(2 ** attempt * 2)
-        raise last_err if last_err else LLMError("gemini request failed")
+        raise last_err if last_err else LLMError(f"{self.name} request failed")
 
     def _namespaced(self, cache_key: str, namespace: str) -> str:
         return f"{namespace}::{cache_key}" if namespace else cache_key
@@ -195,16 +211,10 @@ class GeminiProvider(LLMProvider):
         combos = [(k, m) for k in self._keys() for m in self._models()]
         live = [c for c in combos if c not in self._dead_combos] or combos
         for key, model in live:
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
-                body: dict[str, Any] = {
-                    "system_instruction": {"parts": [{"text": system}]} if system else None,
-                    "contents": [{"parts": [{"text": prompt}]}],
-                    "generationConfig": {"response_mime_type": "application/json", "temperature": 0.1},
-                }
-                body = {k: v for k, v in body.items() if v is not None}
-                data = json.dumps(body).encode()
+                url = self._endpoint(key, model)
+                data = json.dumps(self._request_body(prompt, system, model)).encode()
                 try:
-                    payload = self._request_with_retry(url, data)
+                    payload = self._request_with_retry(url, data, key)
                 except LLMRateLimitError as e:
                     last_err = e
                     tried.append(f"{model}/key…{key[-4:]}")
@@ -222,12 +232,77 @@ class GeminiProvider(LLMProvider):
         raise LLMRateLimitError(f"all key/model combos rate-limited ({'; '.join(tried)}): {last_err}")
 
 
+@dataclass
+class GroqProvider(GeminiProvider):
+    """OpenAI-compatible chat API (docs: console.groq.com/docs).
+
+    Free tier ~30 RPM / 1000 RPD per model (llama-3.1-8b-instant: 14.4K RPD).
+    Inherits rotation, pacing, circuit breaker, and disk cache.
+    """
+
+    name: str = "groq"
+    model: str = "llama-3.3-70b-versatile"
+    min_interval_s: float = 2.2  # 30 RPM headroom
+
+    def __post_init__(self):
+        self.api_key = self.api_key or os.environ.get("GROQ_API_KEY", "")
+        self.model = os.environ.get("GROQ_MODEL", self.model)
+        try:
+            self.min_interval_s = float(os.environ.get("GROQ_MIN_INTERVAL", self.min_interval_s))
+        except ValueError:
+            pass
+        self._dead_combos = set()
+        if not self.api_key:
+            raise LLMConfigError("GROQ_API_KEY is not set (free key at https://console.groq.com)")
+
+    def _keys(self) -> list[str]:
+        keys: list[str] = []
+        for k in [os.environ.get("GROQ_API_KEY", ""), self.api_key,
+                  os.environ.get("GROQ_API_KEY2", ""),
+                  *[x.strip() for x in os.environ.get("GROQ_API_KEYS", "").split(",")]]:
+            if k and k not in keys:
+                keys.append(k)
+        return keys or [""]
+
+    def _models(self) -> list[str]:
+        ms = [self.model]
+        fb = os.environ.get("GROQ_FALLBACK_MODELS", "llama-3.1-8b-instant,qwen/qwen3-32b")
+        for m in [x.strip() for x in fb.split(",") if x.strip()]:
+            if m not in ms:
+                ms.append(m)
+        return ms
+
+    def _endpoint(self, key: str, model: str) -> str:
+        return "https://api.groq.com/openai/v1/chat/completions"
+
+    def _auth_header(self, key: str) -> dict[str, str]:
+        return {"Authorization": "Bearer " + key}
+
+    def _request_body(self, prompt: str, system: str, model: str) -> dict[str, Any]:
+        msgs: list[dict[str, str]] = []
+        if system:
+            msgs.append({"role": "system", "content": system})
+        msgs.append({"role": "user", "content": prompt})
+        return {"model": model, "messages": msgs,
+                "response_format": {"type": "json_object"}, "temperature": 0.1}
+
+    @staticmethod
+    def _parts_text(payload: dict[str, Any]) -> str:
+        try:
+            return payload.get("choices", [{}])[0].get("message", {}).get("content", "") or ""
+        except (AttributeError, IndexError, TypeError):
+            return ""
+
 def get_provider(name: str = "", cache_dir: str = "data/llm_cache") -> LLMProvider:
-    """Factory: 'mock' → MockProvider, else Gemini (requires GEMINI_API_KEY).
+    """Factory: 'mock' → MockProvider, 'groq' → GroqProvider, else Gemini.
 
     Controlled by env LLM_PROVIDER or explicit name. Never import vendor SDKs elsewhere.
     """
     n = (name or os.environ.get("LLM_PROVIDER", "")).lower()
-    if n == "mock" or (not n and not os.environ.get("GEMINI_API_KEY")):
+    if n == "mock" or (not n and not os.environ.get("GEMINI_API_KEY")
+                       and not os.environ.get("GROQ_API_KEY")):
         return MockProvider()
+    if n == "groq" or (not n and os.environ.get("GROQ_API_KEY")
+                       and not os.environ.get("GEMINI_API_KEY")):
+        return GroqProvider(cache_dir=cache_dir)
     return GeminiProvider(cache_dir=cache_dir)

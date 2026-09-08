@@ -133,9 +133,11 @@ persist relationship → Streamlit inspect
 
 | var | default | meaning |
 |---|---|---|
-| `LLM_PROVIDER` | `mock` (auto→`gemini` when key set) | `mock` \| `gemini` |
+| `LLM_PROVIDER` | `mock` (auto→keyed provider) | `mock` \| `gemini` \| `groq` |
 | `GEMINI_API_KEY` | — | free key from AI Studio; required for real LLM |
-| `GEMINI_MODEL` | `gemini-2.5-flash` | eligible free-tier Flash model |
+| `GEMINI_MODEL` | `gemini-3.1-flash-lite` | verified free-tier, most RPD headroom |
+| `GROQ_API_KEY` | — | free key from console.groq.com |
+| `GROQ_MODEL` | `llama-3.3-70b-versatile` | 30 RPM / 1000 RPD; fallback `llama-3.1-8b-instant` (14.4K RPD) |
 | `APP_DB` | `data/app.db` | SQLite path |
 | `DATA_DIR` | `data/files` | page-text cache |
 
