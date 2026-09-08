@@ -108,6 +108,15 @@ CREATE TABLE IF NOT EXISTS page_processing (
     quality TEXT NOT NULL DEFAULT 'unknown',
     PRIMARY KEY (document_id, page)
 );
+
+CREATE TABLE IF NOT EXISTS fact_embeddings (
+    fact_id TEXT PRIMARY KEY REFERENCES facts(id) ON DELETE CASCADE,
+    model TEXT NOT NULL,
+    dim INTEGER NOT NULL,
+    vector TEXT NOT NULL,
+    text_hash TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
 """
 
 
@@ -429,3 +438,27 @@ def list_page_status(conn: sqlite3.Connection, document_id: str) -> list[dict[st
             "SELECT * FROM page_processing WHERE document_id = ? ORDER BY page", (document_id,)
         ).fetchall()
     ]
+
+
+# ---- fact embeddings (auxiliary retrieval only; facts table stays canonical) ----
+
+def upsert_embedding(conn: sqlite3.Connection, fact_id: str, model: str,
+                     vector: list[float], text_hash: str = "") -> None:
+    conn.execute(
+        """INSERT INTO fact_embeddings (fact_id, model, dim, vector, text_hash, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT(fact_id) DO UPDATE SET model=excluded.model, dim=excluded.dim,
+             vector=excluded.vector, text_hash=excluded.text_hash""",
+        (fact_id, model, len(vector), json.dumps(vector), text_hash, _now()),
+    )
+    conn.commit()
+
+
+def get_embedding(conn: sqlite3.Connection, fact_id: str) -> dict[str, Any] | None:
+    return _row_to_dict(conn.execute("SELECT * FROM fact_embeddings WHERE fact_id = ?", (fact_id,)).fetchone())
+
+
+def count_embeddings(conn: sqlite3.Connection, model: str | None = None) -> int:
+    if model:
+        return conn.execute("SELECT COUNT(*) FROM fact_embeddings WHERE model = ?", (model,)).fetchone()[0]
+    return conn.execute("SELECT COUNT(*) FROM fact_embeddings").fetchone()[0]

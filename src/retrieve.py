@@ -1,14 +1,20 @@
 """Selective candidate retrieval — never compare every fact with every fact.
 
-Deterministic filters (subject/predicate/period/scope compatibility) narrow the
-pool; semantic embeddings (if ever added) sit behind SemanticIndex and are used
-for retrieval ONLY, never final classification. SQLite stays source of truth.
+Two candidate sources (TASK3 hybrid):
+- lexical: deterministic token filters (subject/predicate/unit);
+- semantic: embedding cosine over `fact_embeddings` (auxiliary table only).
+Merged + deduped, then structured reranking decides what reaches the
+deterministic relationship layer. Embeddings NEVER classify relationships.
+SQLite stays source of truth; no vector DB.
 """
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 from typing import Any, Optional
+
+from src.embed import EMBEDDING_MODEL, cosine
 
 
 def _tokens(s: str) -> set[str]:
@@ -40,9 +46,30 @@ def _jaccard(a: set[str], b: set[str]) -> float:
 
 
 class SemanticIndex:
-    """Abstraction for future embedding retrieval. Deterministic stub for now."""
+    """In-process cosine index over `fact_embeddings` for one embedding model.
+
+    Loads vectors once; `search` ranks by cosine similarity. Retrieval only.
+    """
+
+    def __init__(self, vectors: dict[str, list[float]] | None = None):
+        self.vectors: dict[str, list[float]] = vectors or {}
+
+    @classmethod
+    def from_db(cls, conn: sqlite3.Connection, model: str = EMBEDDING_MODEL) -> "SemanticIndex":
+        vecs: dict[str, list[float]] = {}
+        for fid, v in conn.execute(
+                "SELECT fact_id, vector FROM fact_embeddings WHERE model = ?", (model,)).fetchall():
+            try:
+                vecs[fid] = [float(x) for x in json.loads(v)]
+            except (ValueError, TypeError):
+                continue
+        return cls(vecs)
+
+    def __len__(self) -> int:
+        return len(self.vectors)
 
     def candidates(self, fact: dict[str, Any], pool: list[dict[str, Any]], limit: int = 20) -> list[dict[str, Any]]:
+        """Legacy token-rank hook (kept for compat); prefer search()."""
         ft, fs = _tokens(fact.get("predicate", "")), _tokens(fact.get("subject", ""))
         scored = []
         for c in pool:
@@ -51,6 +78,89 @@ class SemanticIndex:
             scored.append((s, c))
         scored.sort(key=lambda x: -x[0])
         return [c for _, c in scored[:limit]]
+
+    def search(self, vector: list[float], top_k: int = 20,
+               exclude_ids: Optional[set[str]] = None) -> list[tuple[str, float]]:
+        """Top-K (fact_id, cosine) excluding given ids. No DB access."""
+        excl = exclude_ids or set()
+        scored = [(fid, cosine(vector, v)) for fid, v in self.vectors.items() if fid not in excl]
+        scored.sort(key=lambda x: -x[1])
+        return scored[:top_k]
+
+
+def hybrid_retrieve(
+    conn: sqlite3.Connection,
+    fact: dict[str, Any],
+    index: SemanticIndex,
+    query_vector: list[float],
+    lex_k: int = 20,
+    sem_k: int = 20,
+    exclude_same_doc: bool = True,
+    collection_ids: Optional[list[str]] = None,
+) -> list[dict[str, Any]]:
+    """Lexical ∪ semantic candidates, deduped, self/same-doc removed.
+
+    Returns fact dicts (order: lexical hits first, then semantic-only hits).
+    """
+    lexical = find_candidates(conn, fact, collection_ids, limit=lex_k)
+    lex_ids = {c["id"] for c in lexical}
+    sem_hits = index.search(query_vector, top_k=sem_k, exclude_ids=lex_ids | {fact["id"]})
+    sem_ids = [fid for fid, _ in sem_hits]
+    extra = []
+    if sem_ids:
+        placeholders = ",".join("?" for _ in sem_ids)
+        extra = [dict(r) for r in conn.execute(
+            f"SELECT * FROM facts WHERE id IN ({placeholders})", tuple(sem_ids)).fetchall()]
+    merged = {c["id"]: c for c in lexical}
+    for c in extra:
+        merged.setdefault(c["id"], c)
+    out = [c for c in merged.values()
+           if c["id"] != fact["id"]
+           and not (exclude_same_doc and c.get("document_id") == fact.get("document_id"))]
+    # drop cross-collection strays unless explicitly scoped in
+    scope = set(collection_ids or [fact["collection_id"]])
+    return [c for c in out if c.get("collection_id") in scope]
+
+
+def rerank_score(a: dict[str, Any], b: dict[str, Any],
+                 sem_score: float = 0.0, lex_score: float = 0.0) -> float:
+    """Deterministic, explainable compatibility 0..1 (TASK3 Phase 6).
+
+    Embeddings/lexical scores are advisory inputs; structured fields dominate.
+    """
+    ta, tb = _tokens(a.get("subject", "")), _tokens(b.get("subject", ""))
+    pa, pb = _tokens(a.get("predicate", "")), _tokens(b.get("predicate", ""))
+    if ta == tb and ta:
+        s_sub, s_pred = 1.0, 0.0
+    else:
+        s_sub = 0.6 if (ta and tb and (ta <= tb or tb <= ta or len(ta & tb) / max(len(ta), len(tb)) >= 0.5)) else 0.0
+        s_pred = 0.0
+    if pa == pb and pa:
+        s_pred = 1.0
+    elif pa and pb and (pa <= pb or pb <= pa):
+        s_pred = 0.6
+    elif pa and pb and (pa & pb):
+        s_pred = 0.4
+    ea, eb = (a.get("period_norm") or ""), (b.get("period_norm") or "")
+    s_per = 1.0 if (ea and ea == eb) else (0.5 if not (ea and eb) else 0.0)
+    sa, sb = (a.get("scope") or "").strip().lower(), (b.get("scope") or "").strip().lower()
+    s_scope = 1.0 if (sa and sa == sb) else (0.5 if not (sa and sb) else 0.2)
+    ua, ub = a.get("unit_norm") or "", b.get("unit_norm") or ""
+    s_unit = 1.0 if (ua and ua == ub) else 0.3
+    va, vb = a.get("value_norm"), b.get("value_norm")
+    if va is None or vb is None:
+        s_val = 0.5
+    else:
+        denom = max(abs(va), abs(vb), 1e-9)
+        s_val = 1.0 if abs(va - vb) / denom <= 0.02 else 0.4
+    base = 0.25 * s_sub + 0.25 * s_pred + 0.15 * s_per + 0.10 * s_scope + 0.10 * s_unit + 0.15 * s_val
+    # retrieval signals nudge, never override structure
+    nudge = 0.05 * max(0.0, min(1.0, sem_score)) + 0.05 * max(0.0, min(1.0, lex_score))
+    total = min(1.0, base + nudge)
+    if s_sub == 0.0 and sem_score < 0.5:
+        # different entities with no semantic rescue: not worth judging
+        total = min(total, 0.39)
+    return round(total, 3)
 
 
 def find_candidates(
