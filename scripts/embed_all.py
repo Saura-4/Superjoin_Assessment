@@ -108,7 +108,7 @@ def main():
     # round-robin split across live keys only
     chunks = [todo[i::len(keys)] for i in range(len(keys))]
     # ~90/min: 4 workers x 2.7s pacing rides under the 100 RPM ceiling
-    parts = [(GeminiEmbedder(api_key=k, min_interval_s=2.7), jobs)
+    parts = [(GeminiEmbedder(api_key=k, min_interval_s=2.7), jobs[:args.per_key])
              for k, jobs in zip(keys, chunks)]
     total = 0
     for emb, jobs in parts:
