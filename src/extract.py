@@ -19,6 +19,7 @@ EXTRACT_SYSTEM = """You extract structured facts from a single document page.
 Rules:
 - Output JSON only: {"facts": [ ... ]}. No prose.
 - Each fact: subject (who/what), predicate (snake_case attribute), value_raw (exact number/text as written, "" if non-numeric), unit_raw, period_raw (e.g. FY24, Q4 FY24, a date, or ""), scope (e.g. consolidated, standalone, services-only, or ""), qualifiers (object, may be {}), claim (one human sentence), confidence (0-1), evidence_quote (verbatim substring from SOURCE, max 400 chars).
+- Qualifiers carry the conditions that change meaning: measurement basis (adjusted vs reported, standalone vs consolidated if not in scope), tenure/eligibility tiers, plan/scheme names, rate schedules, lookback windows, footnotes like "excluding Spoton". Empty only when the source truly states none.
 - Only facts stated in SOURCE. Never invent values, periods, or quotes.
 - Prefer meaningful numerical facts (amounts, counts, %, ratios) and key semantic facts (appointments, resignations, addresses, statuses). Skip headers/footers/toc boilerplate.
 - Calibrate confidence honestly: 0.9 = verbatim quote with exact number/period; 0.7 = clear statement but rounded or period inferred; 0.5 or lower = partial/indirect evidence. Never emit 1.0.
@@ -47,6 +48,7 @@ def recalibrate_confidence(model_conf: float, evidence_quote: str) -> float:
     return round(max(0.05, conf), 3)
 
 MAX_SOURCE_CHARS = 6000
+EXTRACT_NAMESPACE = "extract-v3-qualifiers"  # bump when EXTRACT_SYSTEM changes (stale cache = wrong behavior)
 
 
 def _norm_ws(s: str) -> str:
@@ -124,7 +126,8 @@ def extract_facts_from_text(
     text_key = hashlib.sha256(text.encode()).hexdigest()[:16]
     try:
         payload = provider.generate_json(prompt, system=EXTRACT_SYSTEM,
-                                         cache_key=f"extract:p{page}:{text_key}")
+                                         cache_key=f"extract:p{page}:{text_key}",
+                                         namespace=EXTRACT_NAMESPACE)
     except LLMError:
         return []
     out: list[dict[str, Any]] = []

@@ -97,10 +97,15 @@ def hybrid_retrieve(
     sem_k: int = 20,
     exclude_same_doc: bool = True,
     collection_ids: Optional[list[str]] = None,
+    require_compatible_context: bool = False,
 ) -> list[dict[str, Any]]:
     """Lexical ∪ semantic candidates, deduped, self/same-doc removed.
 
     Returns fact dicts (order: lexical hits first, then semantic-only hits).
+    With require_compatible_context, semantic-only hits must share period or
+    unit with the query fact — cheap structured prefilter that kills the
+    within-one-company cosine-mush (everything scores 0.5-0.8) while keeping
+    genuine paraphrases (same FY + same currency).
     """
     lexical = find_candidates(conn, fact, collection_ids, limit=lex_k)
     lex_ids = {c["id"] for c in lexical}
@@ -114,9 +119,18 @@ def hybrid_retrieve(
     merged = {c["id"]: c for c in lexical}
     for c in extra:
         merged.setdefault(c["id"], c)
-    out = [c for c in merged.values()
-           if c["id"] != fact["id"]
-           and not (exclude_same_doc and c.get("document_id") == fact.get("document_id"))]
+    fp, fu = fact.get("period_norm") or "", fact.get("unit_norm") or ""
+    out = []
+    for c in merged.values():
+        if c["id"] == fact["id"]:
+            continue
+        if exclude_same_doc and c.get("document_id") == fact.get("document_id"):
+            continue
+        if require_compatible_context and c["id"] not in lex_ids:
+            cp, cu = c.get("period_norm") or "", c.get("unit_norm") or ""
+            if not ((fp and fp == cp) or (fu and fu == cu)):
+                continue
+        out.append(c)
     # drop cross-collection strays unless explicitly scoped in
     scope = set(collection_ids or [fact["collection_id"]])
     return [c for c in out if c.get("collection_id") in scope]

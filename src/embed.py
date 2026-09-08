@@ -95,6 +95,9 @@ class GeminiEmbedder(Embedder):
         if not self.api_key:
             raise LLMConfigError("GEMINI_API_KEY is not set")
 
+    # NOTE: single key per instance by construction (URL embeds self.api_key;
+    # no rotation). For quota splitting, run two instances with explicit keys.
+
     def _post(self, text: str) -> list[float]:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:embedContent?key={self.api_key}"
         data = json.dumps({"content": {"parts": [{"text": text}]}}).encode()

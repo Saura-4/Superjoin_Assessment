@@ -24,10 +24,14 @@ Return JSON only: {"type": one of CORROBORATES/CONTRADICTS/RECONCILED/TEMPORAL_C
 Rules: same metric+period+scope with equal values (after units) = CORROBORATES. Same metric+period+scope with different values = CONTRADICTS. Same metric but different period granularity/scope/definitions explaining the gap = RECONCILED (name the dimension). Same metric, different time points, changed value = TEMPORAL_CHANGE, not contradiction. Different subjects/entities with different values = UNRELATED, never a contradiction. Differing qualifiers/conditions = RECONCILED or UNRELATED, not CONTRADICTS. Different metrics = UNRELATED. Unclear = UNCERTAIN. Calibrate confidence: 0.9 only for exact agreement/disagreement on precise numbers; 0.6-0.7 for rounded or textually inferred pairs; never 1.0."""
 
 
-def values_equal(v1: Optional[float], v2: Optional[float], tol: float = REL_TOL) -> Optional[bool]:
+def values_equal(v1: Optional[float], v2: Optional[float], tol: float = REL_TOL,
+                 unit: str = "") -> Optional[bool]:
     if v1 is None or v2 is None:
         return None
     if v1 == 0 and v2 == 0:
+        return True
+    # percentages round coarsely in prose (1.6% vs 1.56%): absolute points rule
+    if unit == "PERCENT" and abs(v1 - v2) <= 0.1:
         return True
     denom = max(abs(v1), abs(v2), 1e-9)
     return abs(v1 - v2) / denom <= tol
@@ -70,7 +74,8 @@ def deterministic_decide(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]
         return None  # predicate semantics need judgment
     if _zero_overlap(a.get("subject", ""), b.get("subject", "")):
         va, vb = a.get("value_norm"), b.get("value_norm")
-        if va is not None and vb is not None and values_equal(va, vb) is not True:
+        if va is not None and vb is not None and values_equal(
+                va, vb, unit=a.get("unit_norm") or "") is not True:
             # wholly distinct entities, different values: different facts, not a fight
             return {"type": "UNRELATED", "confidence": 0.85,
                     "reason": "Different subjects with no shared terms and different values; unrelated facts.",
@@ -100,7 +105,7 @@ def deterministic_decide(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]
     if pa and pb and pa != pb:
         # different time points
         if va is not None and vb is not None and ua == ub and ua:
-            eq = values_equal(va, vb)
+            eq = values_equal(va, vb, unit=ua)
             if eq is True:
                 return None  # same value, different periods — ambiguous, ask LLM
             return {"type": "TEMPORAL_CHANGE", "confidence": 0.75,
@@ -112,7 +117,7 @@ def deterministic_decide(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]
     if va is not None and vb is not None:
         if ua != ub or not ua:
             return None  # incomparable units → LLM
-        eq = values_equal(va, vb)
+        eq = values_equal(va, vb, unit=ua)
         if eq is True:
             exact = "exactly" if va == vb else "within rounding"
             return {"type": "CORROBORATES", "confidence": 0.9,
@@ -198,6 +203,39 @@ def relate_pair(provider: LLMProvider, a: dict[str, Any], b: dict[str, Any],
     return llm_judge(provider, a, ev_a, b, ev_b)
 
 
+def classify_pair(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any] | None:
+    """Single per-pair decision, exactly as production applies it.
+
+    Returns a decision dict, or None when the pair needs the LLM judge.
+    Type SKIPPED means dropped before judging (never persisted); UNRELATED is a
+    real verdict that also writes no row. The scorer imports this symbol instead
+    of mirroring these gates, so the two can never drift apart.
+    """
+    if a.get("predicate") != b.get("predicate"):
+        # different predicate names: only worth judging when the numbers
+        # or the period already agree (alias wording); otherwise noise.
+        va, vb = a.get("value_norm"), b.get("value_norm")
+        pa, pb = a.get("period_norm") or "", b.get("period_norm") or ""
+        unit = a.get("unit_norm") or b.get("unit_norm") or ""
+        same_val = values_equal(va, vb, unit=unit) is True if va is not None and vb is not None else False
+        same_per = bool(pa and pb and pa == pb)
+        if not (same_val or same_per):
+            return {"type": "SKIPPED", "confidence": 0.0,
+                    "reason": ("different predicates and neither value nor period agrees: "
+                               "dropped by the diff-predicate admission gate"),
+                    "dimensions": {}}
+    dec = deterministic_decide(a, b)
+    if dec is None:
+        # LLM judgment is reserved for cross-document ambiguity.
+        if a.get("document_id") == b.get("document_id"):
+            return {"type": "SKIPPED", "confidence": 0.0,
+                    "reason": ("deterministic layer abstained and both facts are in one document: "
+                               "dropped without judging"),
+                    "dimensions": {}}
+        return None
+    return dec
+
+
 def relate_new_fact(conn: sqlite3.Connection, provider: LLMProvider, fact: dict[str, Any],
                     collection_ids: Optional[list[str]] = None,
                     evidence_lookup: Optional[dict[str, str]] = None) -> list[dict[str, Any]]:
@@ -221,30 +259,15 @@ def relate_new_facts(conn: sqlite3.Connection, provider: LLMProvider, facts: lis
             f"SELECT * FROM facts WHERE collection_id IN ({placeholders})", tuple(scope)).fetchall()]
     for fact in facts:
         for cand in find_candidates(conn, fact, collection_ids, pool=pool):
-            if fact.get("predicate") != cand.get("predicate"):
-                # different predicate names: only worth judging when the numbers
-                # or the period already agree (alias wording); otherwise the pair
-                # is unjudgeable noise (e.g. generic "count" vs "shipment_count").
-                va, vb = fact.get("value_norm"), cand.get("value_norm")
-                pa, pb = fact.get("period_norm") or "", cand.get("period_norm") or ""
-                same_val = values_equal(va, vb) is True if va is not None and vb is not None else False
-                same_per = bool(pa and pb and pa == pb)
-                if not (same_val or same_per):
-                    continue
-            dec = deterministic_decide(fact, cand)
+            dec = classify_pair(fact, cand)
             if dec is None:
-                # LLM judgment is reserved for cross-document ambiguity: within one
-                # disclosure, distinct facts are noise to a knowledge layer.
-                # Same-doc ambiguity is skipped entirely (no LLM, no row) — the
-                # deterministic pass already settled everything decidable.
-                if cand.get("document_id") == fact.get("document_id"):
-                    continue
                 ambiguous.append((fact, lookup.get(fact["id"], ""), cand, lookup.get(cand["id"], "")))
                 continue
-            if dec["type"] != "UNRELATED":
-                out.append(create_relationship(conn, fact["collection_id"], fact["id"], cand["id"],
-                                               dec["type"], dec.get("confidence", 0.5),
-                                               dec.get("reason", ""), dec.get("dimensions", {})))
+            if dec["type"] in ("UNRELATED", "SKIPPED"):
+                continue
+            out.append(create_relationship(conn, fact["collection_id"], fact["id"], cand["id"],
+                                           dec["type"], dec.get("confidence", 0.5),
+                                           dec.get("reason", ""), dec.get("dimensions", {})))
     if ambiguous:
         judged = llm_judge_batch(provider, ambiguous)
         for (fact, _, cand, _), dec in zip(ambiguous, judged):

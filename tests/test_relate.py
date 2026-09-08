@@ -188,3 +188,27 @@ def test_retrieval_selective_and_scoped(tmp_path):
     rels = relate_new_fact(conn, MockProvider(), {**f2, "collection_id": c1["id"]})
     assert any(r["type"] == "CORROBORATES" for r in rels)
     conn.close()
+
+
+def test_classify_pair_contract():
+    """Scorer-compatible contract: SKIPPED classes, None means judge, else verdict."""
+    from src.relate import classify_pair
+    base = {"id": "a", "collection_id": "c", "document_id": "d1", "subject": "S",
+            "predicate": "p", "value_raw": "10", "value_norm": 10.0, "unit_raw": "",
+            "unit_norm": "COUNT", "period_raw": "FY24", "period_norm": "FY24",
+            "scope": "s", "qualifiers": {}, "claim": "c", "confidence": 0.8}
+    same = dict(base, id="b", document_id="d2")
+    assert classify_pair(base, same)["type"] == "CORROBORATES"
+    # diff predicates, nothing agrees -> SKIPPED
+    other = dict(same, id="c", predicate="q", value_norm=99.0, period_norm="FY23")
+    assert classify_pair(base, other)["type"] == "SKIPPED"
+    # ambiguous same-doc -> SKIPPED; ambiguous cross-doc -> None (judge)
+    amb = dict(base, value_norm=None, period_norm="")
+    amb_same = dict(amb, id="d", document_id="d1")
+    assert classify_pair(amb, amb_same)["type"] == "SKIPPED"
+    amb_cross = dict(amb, id="e", document_id="d9")
+    assert classify_pair(amb, amb_cross) is None
+    # percent rounding now agrees
+    pct_a = dict(base, predicate="m", value_norm=1.6, unit_norm="PERCENT")
+    pct_b = dict(pct_a, id="f", document_id="d2", value_norm=1.56)
+    assert classify_pair(pct_a, pct_b)["type"] == "CORROBORATES"

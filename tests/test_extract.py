@@ -75,12 +75,12 @@ def test_extract_with_mock_and_provenance(tmp_path):
 
 def test_malformed_llm_response_yields_empty():
     class Bad(MockProvider):
-        def generate_json(self, prompt, system="", cache_key=""):
+        def generate_json(self, prompt, system="", cache_key="", namespace=""):
             return {"unexpected": "shape"}
     assert extract_facts_from_text(Bad(), "x" * 200, page=1) == []
 
     class Exploding(MockProvider):
-        def generate_json(self, prompt, system="", cache_key=""):
+        def generate_json(self, prompt, system="", cache_key="", namespace=""):
             from src.llm import LLMError
             raise LLMError("boom")
     assert extract_facts_from_text(Exploding(), "y" * 200, page=1) == []

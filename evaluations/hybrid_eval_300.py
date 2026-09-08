@@ -23,7 +23,7 @@ from src.evalset import select_eval_set  # noqa: E402
 from src.relate import REL_TYPES, deterministic_decide  # noqa: E402
 from src.retrieve import SemanticIndex, find_candidates, hybrid_retrieve, rerank_score  # noqa: E402
 
-LEX_K, SEM_K, RERANK_MIN = 20, 20, 0.4
+LEX_K, SEM_K, RERANK_MIN = 20, 20, 0.55
 
 
 def load_env(path=".env"):
@@ -84,7 +84,8 @@ def main():
         if vec is None:
             continue
         cands = hybrid_retrieve(conn, f, index, vec, lex_k=LEX_K, sem_k=SEM_K,
-                                exclude_same_doc=True, collection_ids=[col[0]])
+                                exclude_same_doc=True, collection_ids=[col[0]],
+                                require_compatible_context=True)
         cands = [c for c in cands if c["id"] in eval_ids]  # pilot scope: 300 only
         lex_only = find_candidates(conn, f, [col[0]], limit=LEX_K)
         lex_ids = {c["id"] for c in lex_only if c["document_id"] != f["document_id"]}

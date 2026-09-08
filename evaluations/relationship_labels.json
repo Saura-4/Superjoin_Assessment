@@ -1,0 +1,1306 @@
+{
+  "version": 1,
+  "note": "Evaluation-only ground truth for the relationship engine. Pairs were drawn from the completed 3-document run in data/run_delhivery.db (2022 prospectus, FY24 annual report, Q4-FY24 earnings deck). Two sources are mixed: 'existing_rel' pairs already carry a relationships row and are stratified across the system's CONTRADICTS / CORROBORATES / RECONCILED / TEMPORAL_CHANGE buckets plus all 12 UNCERTAIN rows, so they measure precision; 'missed_pair' entries have no relationships row and were found by scanning for equal or scale-equivalent value_norm and for shared subject/predicate tokens across documents, so they measure recall. Every pair was labelled after reading both full fact rows and their evidence text and page numbers. Labelling rules applied uniformly: distinct line items, distinct entities, part-vs-whole relations and coincidentally equal values are UNRELATED; the same metric at different periods is TEMPORAL_CHANGE; the same metric differing by an explicit contextual qualifier (standalone vs consolidated, quarterly vs annual, adjusted vs reported, differing population or lookback window) is RECONCILED; agreeing values for the same metric, period and scope are CORROBORATES even when unit scale (INR million vs INR crore) or rounding differs; CONTRADICTS is reserved for a genuine same-metric, same-period, same-scope numeric disagreement. These labels are evaluation-only ground truth and are never imported by src/; no module under src/ reads this file.",
+  "pairs": [
+    {
+      "a_id": "20a8633e1a944cf6",
+      "b_id": "b377e1ece61d46ed",
+      "gold": "RECONCILED",
+      "why": "Same metric (Abhik Mitra's termination benefit under the same August 24, 2021 agreement); the two amounts are alternative entitlements under two stated tenure tiers, so the difference is explained by the qualifier, not a disagreement.",
+      "a_summary": "Abhik Mitra | termination_benefit_amount | 98.05 million INR | 2021-08-24 | consolidated",
+      "b_summary": "Abhik Mitra | termination_benefit_amount | 49.03 million INR | 2021-08-24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "6c1e469906104e1e",
+      "b_id": "71514911a02e46a9",
+      "gold": "RECONCILED",
+      "why": "Same FY24 consolidated period and both are EBITDA margin, but one is the adjusted measure and one the reported measure -- the gap is a definitional (measurement-basis) difference stated on the same deck page.",
+      "a_summary": "Adj. EBITDA margin | percentage | 0.9 % | FY24 | consolidated",
+      "b_summary": "EBITDA margin | percentage | 1.6 % | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "029d6f4c9f8a4299",
+      "b_id": "4a46b954d42e45a6",
+      "gold": "CORROBORATES",
+      "why": "Same metric, FY24, consolidated, across two documents; 0.93% in the annual report and 0.9% in the deck are the same figure at different rounding precision.",
+      "a_summary": "Adjusted EBITDA margin | percentage | 0.93 % | FY24 | consolidated",
+      "b_summary": "Adjusted EBITDA margin | percentage | 0.9 % | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "71514911a02e46a9",
+      "b_id": "d81f5c9c18054f7f",
+      "gold": "CORROBORATES",
+      "why": "Same EBITDA margin metric, FY24, consolidated, across two documents; 1.6% (deck) is 1.56% (annual report) rounded to one decimal.",
+      "a_summary": "EBITDA margin | percentage | 1.6 % | FY24 | consolidated",
+      "b_summary": "EBITDA margin | percentage | 1.56 % | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "1336f43a97434b2e",
+      "b_id": "cdb99cc0bc0c4922",
+      "gold": "RECONCILED",
+      "why": "Same Q4-FY24 consolidated period and same base metric EBITDA; the deck presents Adjusted (21 Cr) and Reported (46 Cr) side by side, so the difference is the stated adjustment, not a conflict.",
+      "a_summary": "Adjusted EBITDA | amount | 21 ₹ Cr | Q4-FY24 | consolidated",
+      "b_summary": "Reported EBITDA | amount | 46 ₹ Cr | Q4-FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "984087ee2a0344f0",
+      "b_id": "cc7cecba2aef498e",
+      "gold": "UNRELATED",
+      "why": "Two distinct balance-sheet line items at the same date -- current borrowings vs non-current borrowings -- which are supposed to carry different amounts.",
+      "a_summary": "Borrowings (current) | amount | 2,702.53 ₹ million | 2021-12-31 | consolidated",
+      "b_summary": "Borrowings (non-current) | amount | 1,005.28 ₹ million | 2021-12-31 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "59541cbe7bd44fac",
+      "b_id": "6017c4b34ba84a6c",
+      "gold": "UNRELATED",
+      "why": "Total equity and total liabilities are different balance-sheet aggregates at the same 2021-12-31 date; they are not the same metric and cannot contradict.",
+      "a_summary": "Total equity | amount | 59,798.47 ₹ million | 2021-12-31 | consolidated",
+      "b_summary": "Total liabilities | amount | 24,496.36 ₹ million | 2021-12-31 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "39dd9dca7f024155",
+      "b_id": "4bb26a1c6e404d69",
+      "gold": "UNRELATED",
+      "why": "Two different subsidiaries (Delhivery USA LLC and Delhivery Robotics LLC) with their own equity investments over the same nine-month period.",
+      "a_summary": "Delhivery USA LLC | investment_in_equity | 149.54 ₹ million | 2021-12-31 | consolidated",
+      "b_summary": "Delhivery Robotics LLC | investment_in_equity | 38.00 ₹ million | 2021-12-31 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "6ab5ba862a2d41d2",
+      "b_id": "aee33757c516428f",
+      "gold": "UNRELATED",
+      "why": "Series I and Series H are distinct preference share instruments, each with its own share count.",
+      "a_summary": "Series I Preference Shares | number_of_shares | 146961 shares | - | standalone",
+      "b_summary": "Series H Preference Shares | number_of_shares | 563349 shares | - | standalone",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "d25c07369d004a41",
+      "b_id": "e775e881fa124747",
+      "gold": "CORROBORATES",
+      "why": "Same entity, FY24, consolidated loss for the year of 2,491.86 million; the two facts differ only in the bracketed-negative sign convention of the source table.",
+      "a_summary": "Delhivery Limited | loss_for_the_year | 2491.86 Indian Rupees in millions | FY24 | consolidated",
+      "b_summary": "Delhivery Limited | loss_for_the_year | (2,491.86) Indian Rupees in million | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "187e9c262b344574",
+      "b_id": "577cf51b4942402d",
+      "gold": "UNRELATED",
+      "why": "Express Parcel service revenue is one segment inside total revenue from services for the same year ended 2024-03-31; component vs total, not rival figures.",
+      "a_summary": "Revenue from Express Parcel services | amount | 50765.87 million INR | 2024-03-31 | consolidated",
+      "b_summary": "Revenue from services | amount | 81415.38 million INR | 2024-03-31 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "121559b3a7224c0a",
+      "b_id": "c208a248a78348f4",
+      "gold": "UNRELATED",
+      "why": "Scope 1 and Scope 2 greenhouse-gas emissions are separate disclosure categories for FY24 and are expected to differ.",
+      "a_summary": "Total Scope 1 emissions | amount | 156,885.60 Metric tonnes of CO2 equivalent | FY24 | consolidated",
+      "b_summary": "Total Scope 2 emissions | amount | 52,668.80 Metric tonnes of CO2 equivalent | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "044cb59d1d8c4773",
+      "b_id": "4e91eb98023d4952",
+      "gold": "UNRELATED",
+      "why": "At the same 2024-03-31 date one figure is the gross unabsorbed depreciation carried forward with no expiry (7,179.04 million) and the other the deferred tax asset recognised on it (1,810.56 million); different quantities.",
+      "a_summary": "Unabsorbed depreciation | amount | 7,179.04 million | 2024-03-31 | consolidated",
+      "b_summary": "Unabsorbed depreciation | amount | 1,810.56 million | 2024-03-31 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "9bca8855f8c141ea",
+      "b_id": "bcb26dc7eded4917",
+      "gold": "UNRELATED",
+      "why": "Options outstanding at 2024-03-31 under two different ESOP schemes (Plan II, 2020 and Plan III, 2020); separate plans, separate balances.",
+      "a_summary": "Delhivery Employees Stock Option Plan - II, 2020 | outstanding_at_end_of_year | 4,246,699 options | 2024-03-31 | standalone",
+      "b_summary": "Delhivery Employees Stock Option Plan III, 2020 | outstanding_at_end_of_year | 4,513,000 options | 2024-03-31 | standalone",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "b52c1bbd79d44a0e",
+      "b_id": "de06709e41484296",
+      "gold": "UNRELATED",
+      "why": "SEBI registration numbers of two different banks (HDFC and Axis); identifiers of distinct entities.",
+      "a_summary": "HDFC Bank Limited | sebi_registration_number | INBI00000063 | - | -",
+      "b_summary": "Axis Bank Limited | sebi_registration_number | INBI00000017 | - | -",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "70fba8b7d54740d4",
+      "b_id": "b0b47c88d8e14295",
+      "gold": "UNRELATED",
+      "why": "Partner-operated (1,209) and self-operated (2,521) delivery centres are disjoint subsets of the network at the same 2021-12-31 date.",
+      "a_summary": "Partner-operated delivery centres | count | 1209 facilities | 2021-12-31 | consolidated",
+      "b_summary": "Self-operated delivery centres | count | 2521 facilities | 2021-12-31 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "496759817f4b4b75",
+      "b_id": "e3c37e379f9e4d83",
+      "gold": "UNRELATED",
+      "why": "Two different lease-tenor buckets (0-36 months at 8.75% and 37-72 months at 9.50%) disclosed in the same FY24 table; different rate schedules, not one rate.",
+      "a_summary": "Effective interest rate for lease liabilities (0-36 months) | rate | 8.75 % p.a. | FY24 | consolidated",
+      "b_summary": "Effective interest rate for lease liabilities (37-72 months) | rate | 9.50 % p.a. | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "8d65a08974e04a87",
+      "b_id": "f35a6e4ee0e94936",
+      "gold": "UNRELATED",
+      "why": "Waste generated and waste disposed are separate FY24 environmental measures and are not expected to be equal.",
+      "a_summary": "Total waste disposed | amount | 1785.2 metric tonnes | FY24 | consolidated",
+      "b_summary": "Total Waste generated | amount | 1,899.00 metric tonnes | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "52277a80ccff4815",
+      "b_id": "ef8783cded564724",
+      "gold": "RECONCILED",
+      "why": "Same FY24 consolidated period and same base metric; 1,266.41 million is reported EBITDA (annual report) while 76 Cr = 760 million is the deck's Adjusted EBITDA, so the gap is the disclosed adjustment.",
+      "a_summary": "EBITDA | amount | 1,266.41 Million INR | FY24 | consolidated",
+      "b_summary": "Adjusted EBITDA | amount | 76 ₹ Cr | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "891b542b8e0e46aa",
+      "b_id": "d3ee4b0996b041a4",
+      "gold": "UNRELATED",
+      "why": "PTL and express parcel are two different service lines within the same FY24 revenue breakdown.",
+      "a_summary": "Revenues from PTL services | amount | 15,174.05 Million INR | FY24 | consolidated",
+      "b_summary": "Revenues from express parcel services | amount | 50,765.87 Million INR | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "4d5b29673ee84cbd",
+      "b_id": "d135023b45fb47c9",
+      "gold": "UNRELATED",
+      "why": "The 53 Cr figure is supply chain service EBITDA on the deck's segment-EBITDA page while 7,760.29 million is supply chain revenue in the annual report; different metrics.",
+      "a_summary": "Supply Chain Services | amount | 53 ₹ Cr | FY24 | consolidated",
+      "b_summary": "Revenues from supply chain services | amount | 7,760.29 Million INR | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "b299cb0c66b8495e",
+      "b_id": "fec2583d86a84896",
+      "gold": "UNRELATED",
+      "why": "Payable days and receivable days are distinct working-capital metrics at the same Mar '24 date.",
+      "a_summary": "Payable days | value | 43 days | Mar '24 | consolidated",
+      "b_summary": "Receivable days | value | 74 days | Mar '24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "1336f43a97434b2e",
+      "b_id": "a0fc9aee02494a02",
+      "gold": "UNRELATED",
+      "why": "Adjusted EBITDA and security expenses are unrelated line items that happen to both read 21 Cr in Q4-FY24.",
+      "a_summary": "Adjusted EBITDA | amount | 21 ₹ Cr | Q4-FY24 | consolidated",
+      "b_summary": "Security expenses | amount | 21 ₹ Cr | Q4-FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "de1ee52837e447d1",
+      "b_id": "ff2187379ea94d0c",
+      "gold": "CORROBORATES",
+      "why": "Both documents state Amit Agarwal is Chief Financial Officer; the 'Company' scope in the prospectus refers to the same Delhivery Limited named in the annual report.",
+      "a_summary": "Amit Agarwal | role | Chief Financial Officer | - | standalone",
+      "b_summary": "Amit Agarwal | role | Chief Financial Officer | - | Company",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "5237bb3bba7244f5",
+      "b_id": "a92640e96e884e80",
+      "gold": "CORROBORATES",
+      "why": "Identical corporate identity number for the same issuer; 'Company' and 'Delhivery Limited' are the same subject, so the standalone/consolidated scope tags are immaterial for an identifier.",
+      "a_summary": "Company | cin | L63090DL2011PLC221234 | - | consolidated",
+      "b_summary": "Delhivery Limited | cin | L63090DL2011PLC221234 | - | standalone",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "d147c2e5d2e64a87",
+      "b_id": "e2fa5aaf668343dc",
+      "gold": "CORROBORATES",
+      "why": "Same restated loss of 8,911.39 million for the nine months to 2021-12-31, consolidated, reported as 'Delhivery' on one page and 'Company' on another of the same prospectus.",
+      "a_summary": "Delhivery | restated_loss | -8911.39 million INR | 2021-12-31 | consolidated",
+      "b_summary": "Company | restated_loss | (8,911.39) ₹ million | 2021-12-31 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "4aafedb521a142c2",
+      "b_id": "f9446e418ad94cde",
+      "gold": "CORROBORATES",
+      "why": "Same daily average fleet size of 15,065 for Q4-FY24, consolidated, reported independently in the annual report and the deck.",
+      "a_summary": "Delhivery | daily_average_fleet_size | 15065 | Q4-FY24 | consolidated",
+      "b_summary": "Fleet size | daily_average_count | 15065 | Q4-FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "7c5f887aaa724849",
+      "b_id": "86051ee9b00a4680",
+      "gold": "UNRELATED",
+      "why": "Two different wholly-owned subsidiaries (Delhivery HK and Delhivery Corp) that coincidentally both sit at 100% ownership.",
+      "a_summary": "Delhivery HK Pte Limited | ownership_percentage | 100 % | - | consolidated",
+      "b_summary": "Delhivery Corp Limited | ownership_percentage | 100 % | - | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "0a7b5fa70152447f",
+      "b_id": "fc1ee24290cd4013",
+      "gold": "UNRELATED",
+      "why": "Underwriting commitments of two different bookrunners; near-equal share counts are a syndicate split, not the same fact.",
+      "a_summary": "Morgan Stanley India Company Private Limited | equity_shares_underwritten | 6,800,987 shares | - | -",
+      "b_summary": "Citigroup Global Markets India Private Limited | equity_shares_underwritten | 6,800,986 shares | - | -",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "cd408f1c92714e00",
+      "b_id": "e80c7dcfcbe545ef",
+      "gold": "CORROBORATES",
+      "why": "Same 740 million express parcel volume for FY24, consolidated, in the deck and the annual report; only the unit wording differs ('Mn' vs 'million parcels').",
+      "a_summary": "Express parcel shipments | shipment_count | 740 Mn | FY24 | consolidated",
+      "b_summary": "Express parcel shipment volumes | count | 740 million parcels | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "0bd1390a4e654377",
+      "b_id": "de14b9ec4e694517",
+      "gold": "CORROBORATES",
+      "why": "Same FY24 consolidated revenue from customers stated as 81,415.38 million in the annual report and 8,142 Cr in the deck -- identical quantity in two currency scales.",
+      "a_summary": "Revenue from contracts with customers | amount | 81,415.38 Million INR | FY24 | consolidated",
+      "b_summary": "Revenue from customers | amount | 8142 ₹ Cr | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "52277a80ccff4815",
+      "b_id": "89f9fa47b85848f3",
+      "gold": "CORROBORATES",
+      "why": "Same FY24 consolidated EBITDA: 1,266.41 million equals 126.6 Cr, which the deck rounds to 127 Cr.",
+      "a_summary": "EBITDA | amount | 1,266.41 Million INR | FY24 | consolidated",
+      "b_summary": "EBITDA | amount | 127 Rs. Cr | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "6831f137df634953",
+      "b_id": "6d8ed92bc20c4e30",
+      "gold": "CORROBORATES",
+      "why": "Same FY24 consolidated EBITDA margin of 1.6% asserted in both documents.",
+      "a_summary": "EBITDA margin | margin | 1.6 % | FY24 | consolidated",
+      "b_summary": "Delhivery Limited | ebitda_margin | 1.6 % | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "656eb10950a54059",
+      "b_id": "d3ee4b0996b041a4",
+      "gold": "CORROBORATES",
+      "why": "Same FY24 consolidated express parcel revenue: 50,765.87 million equals 5,076.6 Cr, reported as 5,077 Cr in the deck.",
+      "a_summary": "Express Parcel revenue | revenue_amount | 5077 ₹ Cr | FY24 | consolidated",
+      "b_summary": "Revenues from express parcel services | amount | 50,765.87 Million INR | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "44058b73b3ac4ae6",
+      "b_id": "69730d4819184744",
+      "gold": "UNRELATED",
+      "why": "Furniture & fittings and plant & machinery are different asset classes in the same FY24 useful-life table; the shared '5' is coincidental.",
+      "a_summary": "Furniture & Fittings | useful_life_management_estimate | 5 years | FY24 | consolidated",
+      "b_summary": "Plant and Machinery | useful_life_management_estimate | 5-10 years | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "53c16696a9904c93",
+      "b_id": "ac0ab6fa65d048a1",
+      "gold": "CORROBORATES",
+      "why": "Same sitting-fee policy per board/committee meeting for non-executive directors: Rs 1 lakh in the annual report equals Rs 0.10 million in the prospectus.",
+      "a_summary": "Non-Executive Independent Directors | sitting_fee_per_meeting | 100000 INR | - | consolidated",
+      "b_summary": "Non-Executive Directors | sitting_fee | 0.10 million | - | standalone",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "1d5b425154f64512",
+      "b_id": "c9fe7f069101405b",
+      "gold": "CORROBORATES",
+      "why": "Both documents describe the same FY24 net working capital movement; the 7-day reduction is exactly the 38-to-31-day change the deck states.",
+      "a_summary": "net working capital cycle | reduction | 7 days | FY24 | consolidated",
+      "b_summary": "NWC days | yoy_reduction | 38 to 31 days | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "b008b9f541744eb1",
+      "b_id": "b45cac2425fd45e3",
+      "gold": "CORROBORATES",
+      "why": "Total equity and networth are the same Mar '24 consolidated aggregate at 9,145 Cr, on two pages of the same deck.",
+      "a_summary": "Total equity | amount | 9145 ₹ Cr | Mar ’24 | consolidated",
+      "b_summary": "Networth | amount | 9,145 ₹ Cr | Mar ’24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "2a6a4987edc64d71",
+      "b_id": "2b4aa4180b174e63",
+      "gold": "UNRELATED",
+      "why": "One fact is a single facility's certification recorded in the 2022 prospectus, the other a company-wide FY24 compliance statement; different subjects and scopes.",
+      "a_summary": "Air Cargo Logistics Center, IGI Airport, New Delhi facility | iso_certification | ISO 45000 | - | facility",
+      "b_summary": "Occupational Health & Safety | iso_certification | ISO 45001:2018 | - | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "3136c96eaa284c85",
+      "b_id": "aba10bcbb25e477e",
+      "gold": "UNRELATED",
+      "why": "Acquisition dates of two different acquired companies (Roadpiper and Primaseller).",
+      "a_summary": "Roadpiper Technologies Private Limited | acquisition_date | January 2020 | - | consolidated",
+      "b_summary": "Primaseller Inc. | acquisition_date | February 2021 | - | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "91f5a2f462b24736",
+      "b_id": "99dad266662d420e",
+      "gold": "UNRELATED",
+      "why": "TL service revenue and capital expenditure are unrelated FY24 line items whose values happen to be close.",
+      "a_summary": "Revenues from TL services | amount | 6,087.96 Million INR | FY24 | consolidated",
+      "b_summary": "Capital expenditure | amount | 6,014.07 Million INR | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "033c00b6146041e1",
+      "b_id": "2495a97cde254f96",
+      "gold": "CORROBORATES",
+      "why": "Same rated automated sort capacity of 3.70 million shipments per day at 2021-12-31, consolidated, stated on two pages of the prospectus.",
+      "a_summary": "automated parcel sorters | rated_automated_sort_capacity | 3.70 million shipments per day | 2021-12-31 | consolidated",
+      "b_summary": "Company | rated_automated_sort_capacity | 3.70 million shipments per day | 2021-12-31 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "00b0dbc6dfeb4c67",
+      "b_id": "33b46e8ed99045ae",
+      "gold": "UNRELATED",
+      "why": "Adjusted EBITDA (deck) and interest expense on lease liabilities (annual report) are unrelated FY24 metrics.",
+      "a_summary": "Adj. EBITDA | amount | 76 Cr | FY24 | consolidated",
+      "b_summary": "Interest expense on lease liabilities | amount | 745.67 million | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "30b0b3d2451b4809",
+      "b_id": "3a98bb1cc8c4457a",
+      "gold": "UNRELATED",
+      "why": "Restated loss before tax and restated total comprehensive loss are different lines of the FY19 restated statement; the near-equal values reflect a small OCI item.",
+      "a_summary": "Restated loss before tax | amount | -17,833.04 ₹ million | 2019-03-31 | consolidated",
+      "b_summary": "Restated total comprehensive loss | amount | -17837.63 ₹ million | 2019-03-31 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "1ff4efa57a4a44fd",
+      "b_id": "bf08af3e2012428c",
+      "gold": "CORROBORATES",
+      "why": "Same director identification number 00031034 for Romesh Sobti in both documents.",
+      "a_summary": "Mr. Romesh Sobti | director_identification_number | 00031034 | - | standalone",
+      "b_summary": "Romesh Sobti | din | 00031034 | - | -",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "18f579d4eeb14457",
+      "b_id": "d25c07369d004a41",
+      "gold": "RECONCILED",
+      "why": "Same FY24 loss for the year; 1,679.68 million is the standalone figure and 2,491.86 million the consolidated one, so the difference is purely reporting scope.",
+      "a_summary": "Delhivery Limited | loss_for_the_year | 1679.68 Million INR | FY24 | standalone",
+      "b_summary": "Delhivery Limited | loss_for_the_year | 2491.86 Indian Rupees in millions | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "75b2e0df93b94c25",
+      "b_id": "c3fcdbaf80db4092",
+      "gold": "RECONCILED",
+      "why": "Same FY24 revenue from operations reported on a standalone (74,540.82 million) and consolidated (81,415.38 million) basis.",
+      "a_summary": "Delhivery Limited | revenue_from_operations | 74540.82 Million INR | FY24 | standalone",
+      "b_summary": "Delhivery Limited | revenue_from_operations | 81415.38 million INR | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "1336f43a97434b2e",
+      "b_id": "ef8783cded564724",
+      "gold": "RECONCILED",
+      "why": "Same Adjusted EBITDA metric and consolidated scope; 21 Cr covers Q4-FY24 and 76 Cr the full FY24, a quarterly-vs-annual granularity difference.",
+      "a_summary": "Adjusted EBITDA | amount | 21 ₹ Cr | Q4-FY24 | consolidated",
+      "b_summary": "Adjusted EBITDA | amount | 76 ₹ Cr | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "2fa5c9280987452f",
+      "b_id": "89f9fa47b85848f3",
+      "gold": "RECONCILED",
+      "why": "Same EBITDA metric and consolidated scope; 46 Cr is Q4-FY24 and 127 Cr is full-year FY24.",
+      "a_summary": "EBITDA | amount | 46 Cr | Q4-FY24 | consolidated",
+      "b_summary": "EBITDA | amount | 127 Rs. Cr | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "976cb58881eb420c",
+      "b_id": "d9c3a4dd780c4308",
+      "gold": "RECONCILED",
+      "why": "Same revenue from services metric, consolidated; 8,142 Cr is FY24 and 2,076 Cr is Q4-FY24.",
+      "a_summary": "Revenue from services | revenue_amount | 8142 ₹ Cr | FY24 | consolidated",
+      "b_summary": "Revenue from services | revenue_amount | 2076 ₹ Cr | Q4-FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "15103b2640d4458f",
+      "b_id": "cd408f1c92714e00",
+      "gold": "RECONCILED",
+      "why": "Same express parcel shipment metric; 176 million is Q4-FY24 and 740 million is full-year FY24.",
+      "a_summary": "Express Parcel shipments | shipment_count | 176 Mn | Q4-FY24 | Express Parcel",
+      "b_summary": "Express parcel shipments | shipment_count | 740 Mn | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "656eb10950a54059",
+      "b_id": "d1a5651543af4946",
+      "gold": "RECONCILED",
+      "why": "Same express parcel revenue metric; 5,077 Cr is FY24 and 1,217 Cr is Q4-FY24.",
+      "a_summary": "Express Parcel revenue | revenue_amount | 5077 ₹ Cr | FY24 | consolidated",
+      "b_summary": "Express Parcel revenue | revenue_amount | 1217 ₹ Cr | Q4-FY24 | Express Parcel",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "42e6952d0d9f4edd",
+      "b_id": "84846d39b0054f19",
+      "gold": "RECONCILED",
+      "why": "Same PTL freight tonnage metric; 384K tons is Q4-FY24 and 1.4 Mn tons is full-year FY24.",
+      "a_summary": "PTL freight tonnage | tonnage | 384 K Tons | Q4-FY24 | consolidated",
+      "b_summary": "PTL freight tonnage | tonnage | 1.4 Mn Tons | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "a9e53c2930134060",
+      "b_id": "725c347681314d52",
+      "gold": "RECONCILED",
+      "why": "Same Mar '24 cash position; 4,033 Cr is the current portion while 5,444 Cr is the total including non-current balances.",
+      "a_summary": "Cash & cash equivalents | amount | 4033 ₹ Cr | Mar ’24 | current",
+      "b_summary": "Cash and cash equivalents | amount | 5,444 ₹ Cr | Mar ’24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "15096fb42b7a4369",
+      "b_id": "dab0fca96734469f",
+      "gold": "RECONCILED",
+      "why": "Same FY24 human-rights training coverage metric measured over two different populations: total employees (81.59%) and total workers (69.27%).",
+      "a_summary": "Delhivery Limited | human_rights_training_coverage_percentage | 81.59 % | FY24 | total employees",
+      "b_summary": "Delhivery Limited | human_rights_training_coverage_percentage | 69.27 % | FY24 | total workers",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "3be99c47974f4d9e",
+      "b_id": "84846d39b0054f19",
+      "gold": "CORROBORATES",
+      "why": "Same FY24 consolidated PTL freight tonnage: 1,429 thousand tonnes in the annual report is the 1.4 million tons the deck reports; same period, same scope, agreeing values in different unit scales.",
+      "a_summary": "Delhivery Limited | part_truckload_tonnage | 1,429 thousand tonnes | FY24 | consolidated",
+      "b_summary": "PTL freight tonnage | tonnage | 1.4 Mn Tons | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "4b5a7c0eb6044fe2",
+      "b_id": "d5678891f7af4e5c",
+      "gold": "CORROBORATES",
+      "why": "Same FY24 consolidated express parcel shipment volume of 740 million in both documents; same period and scope, so this is agreement, not a granularity reconciliation.",
+      "a_summary": "Delhivery Limited | express_parcel_shipment_volume | 740 million | FY24 | consolidated",
+      "b_summary": "Express Parcel shipments | shipment_volume | 740 Mn | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "6831f137df634953",
+      "b_id": "d81f5c9c18054f7f",
+      "gold": "CORROBORATES",
+      "why": "Same FY24 consolidated EBITDA margin; 1.6% is 1.56% rounded, so the two sources agree.",
+      "a_summary": "EBITDA margin | margin | 1.6 % | FY24 | consolidated",
+      "b_summary": "EBITDA margin | percentage | 1.56 % | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "c482a099dbb74541",
+      "b_id": "f2ffc2b6099b4bcb",
+      "gold": "RECONCILED",
+      "why": "Same freight/handling/servicing cost ratio; 73.34% is the FY24 full year and 73.2% the Q4-FY24 quarter.",
+      "a_summary": "Freight, handling and servicing costs | percentage_of_revenue | 73.34 % | FY24 | consolidated",
+      "b_summary": "Freight, Handling and Servicing Cost | percentage_of_revenue_from_services | 73.2 % | Q4-FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "520286237d7a4299",
+      "b_id": "657beda2e02c4a1d",
+      "gold": "RECONCILED",
+      "why": "Same permanent-headcount metric at 2021-12-31 measured over complementary populations: Spoton alone (1,831) and the group excluding Spoton (15,392).",
+      "a_summary": "Spoton permanent employees | count | 1831 employees | 2021-12-31 | Spoton",
+      "b_summary": "Permanent employees (excluding Spoton) | count | 15392 employees | 2021-12-31 | worldwide",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "2d19d5d9f6154e23",
+      "b_id": "82b2b9c67d8f4fab",
+      "gold": "CORROBORATES",
+      "why": "Same consolidated trade receivables at 2024-03-31: 14,296.90 million equals 1,429.7 Cr, which the deck reports as 1,430 Cr.",
+      "a_summary": "Trade Receivables | amount | 14296.90 million INR | 2024-03-31 | consolidated",
+      "b_summary": "Trade receivables | amount | 1430 ₹ Cr | Mar ’24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "6a9bbf221e8c45c6",
+      "b_id": "eb0b3f136d2a4de7",
+      "gold": "CORROBORATES",
+      "why": "Same FY24 consolidated loss after tax: (2,491.86) million equals (249.2) Cr, reported as (249) Cr in the deck.",
+      "a_summary": "Profit / (Loss) after tax | net_income | -249 ₹ Cr | FY24 | consolidated",
+      "b_summary": "Profit after tax | amount | -2,491.86 Million INR | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "2838c9055b6f4b59",
+      "b_id": "f1a7b58635bc4012",
+      "gold": "UNRELATED",
+      "why": "Shareholdings in two different investees (Falcon Autotech associate at 39.34% and Spoton subsidiary at 100%).",
+      "a_summary": "Falcon Autotech Private Limited | shareholding_percentage | 39.34 % | FY24 | associate",
+      "b_summary": "Spoton Logistics Private Limited | shareholding_percentage | 100.00 % | FY24 | subsidiary",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "e9e66045ef6a44dd",
+      "b_id": "facbcf286e564eb2",
+      "gold": "CORROBORATES",
+      "why": "Both documents record the same person (Ajith Pai / Ajith Pai Mangalore) in the same Chief Operating Officer role.",
+      "a_summary": "Ajith Pai | role | Chief Operating Officer | 2024-07-05 | Key Managerial Personnel",
+      "b_summary": "Ajith Pai Mangalore | role | Chief Operating Officer | - | Company",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "625f8a5f6c8344af",
+      "b_id": "662e8230599141bc",
+      "gold": "RECONCILED",
+      "why": "Same weighted average cost of acquisition metric for Kapil Bharati computed over different share sets and lookback windows (offer shares vs the one year preceding the prospectus).",
+      "a_summary": "Kapil Bharati | weighted_average_cost_of_acquisition | 35.18 INR | - | standalone",
+      "b_summary": "Kapil Bharati | weighted_average_cost_of_acquisition | 23.57 ₹ | one year preceding the date of this Prospectus | Individual Selling Shareholders",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "6675311613fd48bd",
+      "b_id": "84525ad10b7c48dc",
+      "gold": "RECONCILED",
+      "why": "Two distinct appointment events for the same officer: appointed company secretary on June 19, 2021 (prospectus) and appointed Company Secretary and Compliance Officer effective June 01, 2023 after serving as Deputy Company Secretary (annual report).",
+      "a_summary": "Vivek Kumar | appointment_date | June 19, 2021 | - | company secretary",
+      "b_summary": "Vivek Kumar | appointment_date | June 01, 2023 | FY24 | standalone",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "51bd9727dee44956",
+      "b_id": "af1b8fd28ad146df",
+      "gold": "RECONCILED",
+      "why": "Same TL revenue growth metric; 40% is the FY24 full-year rate and 59% the Q4-FY24 rate.",
+      "a_summary": "TL revenue | yoy_growth_rate | 40 % | FY24 | consolidated",
+      "b_summary": "TL Service revenue | yoy_growth_rate | 59 % | Q4-FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "6b6f3a57ac094ad4",
+      "b_id": "db40b9a3b56a488f",
+      "gold": "UNRELATED",
+      "why": "Non-current lease liabilities (844 Cr) are one component inside total liabilities (2,308 Cr) at the same Mar '24 date.",
+      "a_summary": "Total liabilities | amount | 2308 ₹ Cr | Mar ’24 | consolidated",
+      "b_summary": "Lease liabilities | amount | 844 ₹ Cr | Mar ’24 | non-current",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "a8990e07a70f4566",
+      "b_id": "c78ef2d74bcd4689",
+      "gold": "UNRELATED",
+      "why": "Authorised share capital of a UK subsidiary in GBP versus that of the Indian parent in INR; different entities and different currencies.",
+      "a_summary": "Delhivery Corp Limited | authorised_share_capital | 2269165 GBP | date of this Prospectus | standalone",
+      "b_summary": "Delhivery | authorised_share_capital | 1342535980 INR | 2024-03-31 | standalone",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "3d2260030cb445fd",
+      "b_id": "f33f6c8089514cfd",
+      "gold": "RECONCILED",
+      "why": "Same person's role recorded under two different scopes: committee membership on the Stakeholders' Relationship Committee and board designation as Executive Director and CTO; both hold simultaneously.",
+      "a_summary": "Kapil Bharati | role | Member | - | Stakeholders’ Relationship Committee",
+      "b_summary": "Kapil Bharati | role | Executive Director and Chief Technology Officer | - | standalone",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "12854b0f0a9045ce",
+      "b_id": "326a33409b0e4ce6",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same Adjusted EBITDA metric and consolidated scope measured in two consecutive quarters, Q1-FY23 and Q2-FY23.",
+      "a_summary": "Adjusted EBITDA | value | -125 ₹ Cr | Q1-FY23 | consolidated",
+      "b_summary": "Adjusted EBITDA | value | -67 ₹ Cr | Q2-FY23 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "078df15d514d4808",
+      "b_id": "32066b90461d462b",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same Adjusted EBITDA metric and scope in the same fiscal quarter one year apart, Q4-FY23 vs Q4-FY24.",
+      "a_summary": "Adjusted EBITDA | value | 6 ₹ Cr | Q4-FY23 | consolidated",
+      "b_summary": "Adjusted EBITDA | value | 92 ₹ Cr | Q4-FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "800ce4819370403d",
+      "b_id": "9ce523e12e724450",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Successive increases of the same authorised share capital, dated July 24, 2014 and March 27, 2015; the second explicitly starts from the first value.",
+      "a_summary": "Authorised share capital | increase | 134,500,000 INR | 2014-07-24 | -",
+      "b_summary": "Authorised share capital | increase | 174,500,000 INR | 2015-03-27 | -",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "37bdd173af084f8f",
+      "b_id": "ee5d7b273d1946fe",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same basic loss per share metric, consolidated, at two different reporting periods (FY19 and the nine months to 2021-12-31).",
+      "a_summary": "Basic loss per share | amount | -47.22 INR | 2019-03-31 | consolidated",
+      "b_summary": "Basic loss per share | amount | -15.36 INR | 2021-12-31 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "0b436ec8b9c44da8",
+      "b_id": "1182753d95714417",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same capex-to-revenue ratio and services scope for two consecutive years, FY23 and FY24.",
+      "a_summary": "Capital Expenditure | capex_as_percent_of_revenue | 7.8 % | FY23 | services",
+      "b_summary": "Capital Expenditure | capex_as_percent_of_revenue | 7.4 % | FY24 | services",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "4ba5ef283ab34668",
+      "b_id": "5fedfda63e154fca",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same consolidated total assets measured at 2019-03-31 and 2021-12-31.",
+      "a_summary": "Company | total_assets | 40,625.45 ₹ million | 2019-03-31 | consolidated",
+      "b_summary": "Company | total_assets | 84,294.83 ₹ million | 2021-12-31 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "3796a997226640b1",
+      "b_id": "c95338b8860944d7",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same debt-excluding-CCPS balance at two consecutive year ends, Mar '23 and Mar '24.",
+      "a_summary": "Debt (excludes CCPS) | amount | 126 ₹ Cr | Mar ’24 | consolidated",
+      "b_summary": "Debt (excludes CCPS) | amount | 199 ₹ Cr | Mar ’23 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "2d8449335e0349ca",
+      "b_id": "4c7df6c3b8f84592",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same debt/equity ratio at two consecutive year ends, Mar '23 and Mar '24.",
+      "a_summary": "Debt/Equity ratio | ratio | 0.02 x | Mar ’23 | consolidated",
+      "b_summary": "Debt/Equity ratio | ratio | 0.01 x | Mar ’24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "555b20f9a9f6405c",
+      "b_id": "7952f6c1c3ab455a",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same sustainably-sourced-inputs percentage for FY23 and FY24; the source sentence states the movement explicitly.",
+      "a_summary": "Delhivery | sustainably_sourced_inputs_percentage | 55 % | FY24 | consolidated",
+      "b_summary": "Delhivery | sustainably_sourced_inputs_percentage | 43 % | FY23 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "9f71145cccb840f1",
+      "b_id": "f40bd785c3d74bed",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same consolidated total trade receivables at 2023-03-31 and 2024-03-31.",
+      "a_summary": "Delhivery Limited | total_trade_receivables | 18540.44 million INR | 2023-03-31 | consolidated",
+      "b_summary": "Delhivery Limited | total_trade_receivables | 17532.27 million INR | 2024-03-31 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "6a30ea03246247e1",
+      "b_id": "d25c07369d004a41",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same consolidated loss for the year in FY23 and FY24, from the same comparative statement.",
+      "a_summary": "Delhivery Limited | loss_for_the_year | 10077.79 Indian Rupees in millions | FY23 | consolidated",
+      "b_summary": "Delhivery Limited | loss_for_the_year | 2491.86 Indian Rupees in millions | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "3972607b151949f1",
+      "b_id": "62423b40c0004525",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same India GDP growth metric for two periods; FY24 is actual and FY25 is the RBI projection.",
+      "a_summary": "India | gdp_growth_rate | 8.2 % | FY24 | India",
+      "b_summary": "India | gdp_growth_rate | 7.2 % | FY25 | India",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "327d1d1d7b2742ba",
+      "b_id": "451406c189324707",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same net working capital days metric, consolidated, at Mar '20 and Mar '21.",
+      "a_summary": "Net Working Capital Days | value | 47 days | Mar '21 | consolidated",
+      "b_summary": "Net Working Capital Days | value | 73 days | Mar '20 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "187e9c262b344574",
+      "b_id": "4a086d8207284fc0",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same express parcel service revenue, consolidated, reported for the nine months to 2021-12-31 in the prospectus and for the year to 2024-03-31 in the annual report.",
+      "a_summary": "Revenue from Express Parcel services | amount | 50765.87 million INR | 2024-03-31 | consolidated",
+      "b_summary": "Revenue from Express Parcel Services | amount | 29587.59 million INR | 2021-12-31 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "3d499e69309e47da",
+      "b_id": "59541cbe7bd44fac",
+      "gold": "UNRELATED",
+      "why": "Total assets at Mar '24 and total equity at 2021-12-31 are different metrics; the differing period does not make them a time series.",
+      "a_summary": "Total assets | amount | 11453 ₹ Cr | Mar ’24 | consolidated",
+      "b_summary": "Total equity | amount | 59,798.47 ₹ million | 2021-12-31 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "59541cbe7bd44fac",
+      "b_id": "b008b9f541744eb1",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same consolidated total equity at two dates: 59,798.47 million (about 5,980 Cr) at 2021-12-31 and 9,145 Cr at Mar '24.",
+      "a_summary": "Total equity | amount | 59,798.47 ₹ million | 2021-12-31 | consolidated",
+      "b_summary": "Total equity | amount | 9145 ₹ Cr | Mar ’24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "22482ce7002942cb",
+      "b_id": "a664e49763624417",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same PIN-code reach metric measured at 2021-12-31 (17,488) and in the FY24 annual report (more than 18,700).",
+      "a_summary": "Delhivery | pin_code_reach | 17488 count | 2021-12-31 | consolidated",
+      "b_summary": "Delhivery | pin_code_reach | 18700 pin codes | - | India",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "a133acdae2884879",
+      "b_id": "f18222e0cc1f4645",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same active-customer count at 2021-12-31 (23,113, excluding Spoton) and Q4-FY24 (33,278).",
+      "a_summary": "Active Customers | count | 23113 customers | 2021-12-31 | excluding Spoton",
+      "b_summary": "Active Customers | count | 33278 | Q4-FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "b697bb7b743940db",
+      "b_id": "cf65a9c96c154163",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same consolidated employee benefit expense for two periods: 9,726.30 million for the nine months to 2021-12-31 and 1,437 Cr for FY24.",
+      "a_summary": "Employee benefit expense | amount | 1437 ₹ Cr | FY24 | consolidated",
+      "b_summary": "Employee benefit expense | amount | 9,726.30 ₹ million | 2021-12-31 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "6ca2539b9640436c",
+      "b_id": "fe9e46d31a3c43e2",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same rated automated sort capacity, consolidated, at 2021-12-31 (3.70 million/day) and 2024-03-31 (7.1 million/day).",
+      "a_summary": "Delhivery Limited | rated_automated_sort_capacity | 7.1 million shipments per day | 2024-03-31 | consolidated",
+      "b_summary": "Delhivery | rated_automated_sort_capacity | 3.70 million parcels/day | 2021-12-31 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "3ea44d899d6c45df",
+      "b_id": "cfebef34aabf461d",
+      "gold": "RECONCILED",
+      "why": "Two separate resignation events for the same officer covering different tenures: as company secretary on September 17, 2021 and as Company Secretary and Compliance Officer on March 27, 2024.",
+      "a_summary": "Vivek Kumar | resignation_date | September 17, 2021 | - | company secretary",
+      "b_summary": "Mr. Vivek Kumar | resignation_date | March 27, 2024 | - | standalone",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "af544c30430e4e57",
+      "b_id": "b50848fa46104690",
+      "gold": "UNRELATED",
+      "why": "One fact is a single bonus-share allotment on 2021-09-29 (a flow) and the other the total shareholding held at 2024-03-31 (a stock); different quantities despite similar magnitudes.",
+      "a_summary": "Sahil Barua | equity_shares_acquired | 12,298,050 shares | 2021-09-29 | standalone",
+      "b_summary": "Mr. Sahil Barua | equity_shares_held | 12218805 shares | 2024-03-31 | standalone",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "5603d879aa484b3f",
+      "b_id": "e30f6f1dd1984610",
+      "gold": "UNRELATED",
+      "why": "Express parcel shipment count and express delivery centre count are different metrics from different periods.",
+      "a_summary": "Express parcel shipments | count | 406.51 million | 2021-12-31 | consolidated",
+      "b_summary": "Express delivery centers | count | 3506 | Q4-FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "c55f1f5a619a4481",
+      "b_id": "ded77530784c466a",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same person's remuneration measured over the nine months to 2021-12-31 (353.01 million) and FY24 (663.53 million).",
+      "a_summary": "Mr. Sahil Barua | remuneration | 663.53 million INR | FY24 | consolidated",
+      "b_summary": "Sahil Barua | remuneration | 353.01 ₹ million | 2021-12-31 | standalone",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "203ac98ac5784ea3",
+      "b_id": "44d65abed15443eb",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same cumulative-since-inception express parcel milestone at two dates: 1 billion in 2021 and more than 2.8 billion at 2024-03-31.",
+      "a_summary": "Delhivery | express_parcel_shipments_delivered | 2.8 Bn | 2024-03-31 | consolidated",
+      "b_summary": "Delhivery Limited | express_parcel_shipments_delivered | 1,000,000,000 shipments | 2021 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "33c52eae575c4c2f",
+      "b_id": "c0e31e62e36648a5",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same key-managerial-personnel attrition count in two consecutive fiscal years, Fiscal 2020 (0) and Fiscal 2021 (1).",
+      "a_summary": "Key Managerial Personnel | attrition_count | 0 | Fiscal 2020 | consolidated",
+      "b_summary": "Key Managerial Personnel | attrition_count | 1 | Fiscal 2021 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": false
+    },
+    {
+      "a_id": "029d6f4c9f8a4299",
+      "b_id": "08f45e0c1e044011",
+      "gold": "UNRELATED",
+      "why": "Company-wide adjusted EBITDA margin versus the Express Parcel service margin for FY24; different metrics at different levels of the business.",
+      "a_summary": "Adjusted EBITDA margin | percentage | 0.93 % | FY24 | consolidated",
+      "b_summary": "Express Parcel | margin_percentage | 18.4 % | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "cc7cecba2aef498e",
+      "b_id": "ef45cbda9b7647f4",
+      "gold": "UNRELATED",
+      "why": "Non-current borrowings at 2021-12-31 and a FY21 capex reallocation note are unrelated metrics from different documents and periods.",
+      "a_summary": "Borrowings (non-current) | amount | 1,005.28 ₹ million | 2021-12-31 | consolidated",
+      "b_summary": "Capital Expenditure | reallocated_amount | 100 Cr | FY21 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "5f5926cc95284861",
+      "b_id": "b3c0d3c3a63b445c",
+      "gold": "UNRELATED",
+      "why": "FY24 closing cash balance and FY24 depreciation of right-of-use assets are unrelated line items.",
+      "a_summary": "Closing cash balance at the end of the year | amount | 303 ₹ Cr | FY24 | consolidated",
+      "b_summary": "Depreciation expense of right-of-use assets | amount | 2,330.41 million | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "566f3861c2444be6",
+      "b_id": "71f675149bc34535",
+      "gold": "UNRELATED",
+      "why": "FY24 alternative-fuel vehicle count and a 2021 headcount of security guards are unrelated metrics with coincidentally similar values.",
+      "a_summary": "Delhivery | alternative_fuel_vehicle_fleet_count | 1634 units | FY24 | consolidated",
+      "b_summary": "Guards | count | 1607 guards | 2021-12-31 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "496759817f4b4b75",
+      "b_id": "f7aabe2c14824d61",
+      "gold": "UNRELATED",
+      "why": "A lease-liability interest rate and a segment revenue growth rate share only the percent unit and the FY24 period.",
+      "a_summary": "Effective interest rate for lease liabilities (0-36 months) | rate | 8.75 % p.a. | FY24 | consolidated",
+      "b_summary": "Supply Chain Services revenue | yoy_growth_rate | -48 % | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "52d8eac303484896",
+      "b_id": "d903dbdafad84303",
+      "gold": "UNRELATED",
+      "why": "FY24 loss for the year and FY24 closing cash and cash equivalents are different line items.",
+      "a_summary": "Loss for the year | amount | 2,491.86 Million INR | FY24 | consolidated",
+      "b_summary": "Cash & cash equivalents at the end of the year | amount | 5,444 ₹ Cr | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "79cad25a026440dc",
+      "b_id": "e94da864225f428f",
+      "gold": "UNRELATED",
+      "why": "Roles of two different advisory firms (internal auditor versus international legal adviser) for different documents.",
+      "a_summary": "PricewaterhouseCoopers Services LLP | role | internal_audit_firm | - | consolidated",
+      "b_summary": "Latham & Watkins LLP | role | International Legal Advisers to the Company | - | -",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "1606d11bcab342a0",
+      "b_id": "4a46b954d42e45a6",
+      "gold": "UNRELATED",
+      "why": "Profit after tax margin for the nine months to 2021-12-31 and adjusted EBITDA margin for FY24 are different metrics in different periods.",
+      "a_summary": "Profit/(loss) after tax margin | percentage | -18.14 % | 2021-12-31 | consolidated",
+      "b_summary": "Adjusted EBITDA margin | percentage | 0.9 % | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "0bd1390a4e654377",
+      "b_id": "90c7071107e04dde",
+      "gold": "UNRELATED",
+      "why": "Total FY24 revenue from customers versus a single service-line revenue on the deck; component vs total, not comparable measurements.",
+      "a_summary": "Revenue from contracts with customers | amount | 81,415.38 Million INR | FY24 | consolidated",
+      "b_summary": "TL revenue | revenue_amount | 318 ₹ Cr | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "891b542b8e0e46aa",
+      "b_id": "d1e03e44224d42d3",
+      "gold": "UNRELATED",
+      "why": "FY24 PTL service revenue and FY24 net cash used in capex and M&A are unrelated line items.",
+      "a_summary": "Revenues from PTL services | amount | 15,174.05 Million INR | FY24 | consolidated",
+      "b_summary": "Net cash from / (used in) capex and M&A | amount | (543) ₹ Cr | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "d135023b45fb47c9",
+      "b_id": "dffa203d49eb46a4",
+      "gold": "UNRELATED",
+      "why": "FY24 supply chain revenue and FY24 net cash used in financing activities are unrelated line items.",
+      "a_summary": "Revenues from supply chain services | amount | 7,760.29 Million INR | FY24 | consolidated",
+      "b_summary": "Net cash from / (used in) financing activities | amount | (366) ₹ Cr | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "4c671844a73c4223",
+      "b_id": "71514911a02e46a9",
+      "gold": "UNRELATED",
+      "why": "Worker training coverage percentage and EBITDA margin share only the percent unit and the FY24 period.",
+      "a_summary": "Workers | training_coverage_percentage | 45 % | FY24 | consolidated",
+      "b_summary": "EBITDA margin | percentage | 1.6 % | FY24 | consolidated",
+      "source": "existing_rel",
+      "cross_doc": true
+    },
+    {
+      "a_id": "b824c5b4365740a8",
+      "b_id": "cd408f1c92714e00",
+      "gold": "CORROBORATES",
+      "why": "Same FY24 consolidated express parcel volume of 740 million asserted by the annual report highlights page and the deck.",
+      "a_summary": "Delhivery Limited | express_parcels_shipped | 740 Mn | FY24 | consolidated",
+      "b_summary": "Express parcel shipments | shipment_count | 740 Mn | FY24 | consolidated",
+      "source": "missed_pair",
+      "cross_doc": true
+    },
+    {
+      "a_id": "4b5a7c0eb6044fe2",
+      "b_id": "cd408f1c92714e00",
+      "gold": "CORROBORATES",
+      "why": "Same FY24 consolidated express parcel shipment volume of 740 million in the annual report and the deck.",
+      "a_summary": "Delhivery Limited | express_parcel_shipment_volume | 740 million | FY24 | consolidated",
+      "b_summary": "Express parcel shipments | shipment_count | 740 Mn | FY24 | consolidated",
+      "source": "missed_pair",
+      "cross_doc": true
+    },
+    {
+      "a_id": "41dbc4a941bb43d1",
+      "b_id": "976cb58881eb420c",
+      "gold": "CORROBORATES",
+      "why": "Same FY24 consolidated revenue from services: 81,415 million equals 8,141.5 Cr, reported as 8,142 Cr in the deck.",
+      "a_summary": "Delhivery Limited | revenue_from_services | 81,415 ₹ million | FY24 | consolidated",
+      "b_summary": "Revenue from services | revenue_amount | 8142 ₹ Cr | FY24 | consolidated",
+      "source": "missed_pair",
+      "cross_doc": true
+    },
+    {
+      "a_id": "d7f0c5dfe1dd43bc",
+      "b_id": "de14b9ec4e694517",
+      "gold": "CORROBORATES",
+      "why": "Same FY24 consolidated revenue from contracts with customers: 81,415.38 million equals 8,141.5 Cr, reported as 8,142 Cr.",
+      "a_summary": "Delhivery Limited | revenue_from_contracts_with_customers | 81,415.38 Indian Rupees in million | FY24 | consolidated",
+      "b_summary": "Revenue from customers | amount | 8142 ₹ Cr | FY24 | consolidated",
+      "source": "missed_pair",
+      "cross_doc": true
+    },
+    {
+      "a_id": "187e9c262b344574",
+      "b_id": "656eb10950a54059",
+      "gold": "CORROBORATES",
+      "why": "Same FY24 consolidated express parcel revenue: 50,765.87 million equals 5,076.6 Cr, reported as 5,077 Cr in the deck.",
+      "a_summary": "Revenue from Express Parcel services | amount | 50765.87 million INR | 2024-03-31 | consolidated",
+      "b_summary": "Express Parcel revenue | revenue_amount | 5077 ₹ Cr | FY24 | consolidated",
+      "source": "missed_pair",
+      "cross_doc": true
+    },
+    {
+      "a_id": "aae6e1856f604dc5",
+      "b_id": "ef8783cded564724",
+      "gold": "CORROBORATES",
+      "why": "Same FY24 consolidated adjusted EBITDA: 758 million equals 75.8 Cr, reported as 76 Cr in the deck.",
+      "a_summary": "Delhivery Limited | adjusted_ebitda | 758 ₹ million | FY24 | consolidated",
+      "b_summary": "Adjusted EBITDA | amount | 76 ₹ Cr | FY24 | consolidated",
+      "source": "missed_pair",
+      "cross_doc": true
+    },
+    {
+      "a_id": "483d4136edfd4762",
+      "b_id": "3192b7c395b64879",
+      "gold": "CORROBORATES",
+      "why": "Same FY24 consolidated Service EBITDA: 9,414 million equals 941.4 Cr, reported as 941 Cr in the deck.",
+      "a_summary": "Delhivery Limited | service_ebitda | 9,414 ₹ million | FY24 | consolidated",
+      "b_summary": "Service EBITDA | amount | 941 ₹ Cr | FY24 | consolidated",
+      "source": "missed_pair",
+      "cross_doc": true
+    },
+    {
+      "a_id": "3df808e30259443c",
+      "b_id": "a4801d857a32424e",
+      "gold": "CORROBORATES",
+      "why": "Same FY24 consolidated net cash from operating activities: 4,724.02 million equals 472.4 Cr, reported as 472 Cr.",
+      "a_summary": "Delhivery Limited | net_cash_from_operating_activities | 4,724.02 Indian Rupees in millions | FY24 | consolidated",
+      "b_summary": "Net cash from / (used in) operating activities | amount | 472 ₹ Cr | FY24 | consolidated",
+      "source": "missed_pair",
+      "cross_doc": true
+    },
+    {
+      "a_id": "024f5c44e12e44e6",
+      "b_id": "d2c3a2dac8bc424a",
+      "gold": "CORROBORATES",
+      "why": "Same pin-code coverage of 18,793 at 2024-03-31 / Q4-FY24, consolidated, in both documents.",
+      "a_summary": "Delhivery | pin_codes_covered | 18793 | 2024-03-31 | consolidated",
+      "b_summary": "Pin-code reach | count | 18793 | Q4-FY24 | consolidated",
+      "source": "missed_pair",
+      "cross_doc": true
+    },
+    {
+      "a_id": "203ac98ac5784ea3",
+      "b_id": "512f4b5ddbd44aba",
+      "gold": "CORROBORATES",
+      "why": "Same cumulative-since-inception express parcel figure of over 2.8 billion, consolidated, in the annual report (as of 2024-03-31) and the deck.",
+      "a_summary": "Delhivery | express_parcel_shipments_delivered | 2.8 Bn | 2024-03-31 | consolidated",
+      "b_summary": "Express parcel shipments | cumulative_shipment_count | 2.8 Bn+ | since inception | consolidated",
+      "source": "missed_pair",
+      "cross_doc": true
+    },
+    {
+      "a_id": "ffe838946a4a47bc",
+      "b_id": "451e45de47a347c8",
+      "gold": "CORROBORATES",
+      "why": "Same cumulative-since-inception PTL freight tonnage of over 4.8 million tonnes in both documents.",
+      "a_summary": "Delhivery | part_truckload_freight_delivered | 4.8 Mn tonnes | 2024-03-31 | consolidated",
+      "b_summary": "PTL freight tonnage | cumulative_tonnage | 4.8 Mn+ Tons | since inception | consolidated",
+      "source": "missed_pair",
+      "cross_doc": true
+    },
+    {
+      "a_id": "7722a5718cdc4bed",
+      "b_id": "36098be9b9924c48",
+      "gold": "CORROBORATES",
+      "why": "Same count of 29 automated sort centres, consolidated, in the annual report and the deck's Q4-FY24 operating table.",
+      "a_summary": "Delhivery | automated_sort_centers_count | 29 | - | consolidated",
+      "b_summary": "Automated sort centers | count | 29 | Q4-FY24 | consolidated",
+      "source": "missed_pair",
+      "cross_doc": true
+    },
+    {
+      "a_id": "9ab55d7a78af4dc1",
+      "b_id": "1e9d9e5146b9450f",
+      "gold": "CORROBORATES",
+      "why": "Same net working capital days of 31 at March 2024, consolidated, in both documents.",
+      "a_summary": "Delhivery Limited | net_working_capital_days | 31 days | March 2024 | consolidated",
+      "b_summary": "Net Working Capital Days | value | 31 days | Mar '24 | consolidated",
+      "source": "missed_pair",
+      "cross_doc": true
+    },
+    {
+      "a_id": "024f5c44e12e44e6",
+      "b_id": "0268d8ae3ab34ccd",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same PIN-code coverage metric, consolidated, at 2021-12-31 (17,488, prospectus) and 2024-03-31 (18,793, annual report).",
+      "a_summary": "Delhivery | pin_codes_covered | 18793 | 2024-03-31 | consolidated",
+      "b_summary": "Company | pin_codes_serviced | 17488 PIN codes | 2021-12-31 | consolidated",
+      "source": "missed_pair",
+      "cross_doc": true
+    },
+    {
+      "a_id": "cb66d79031564578",
+      "b_id": "a133acdae2884879",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same active-customer count measured for the nine months to 2021-12-31 (23,113) and Q4-FY24 (over 33,200).",
+      "a_summary": "Delhivery | active_customers | 33200 | Q4-FY24 | consolidated",
+      "b_summary": "Active Customers | count | 23113 customers | 2021-12-31 | excluding Spoton",
+      "source": "missed_pair",
+      "cross_doc": true
+    },
+    {
+      "a_id": "4f05df0b50e04382",
+      "b_id": "ceea2a7224b74212",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same consolidated basic loss per share at two periods: (15.36) for the nine months to 2021-12-31 and (3.40) for FY24.",
+      "a_summary": "Company | basic_loss_per_share | (15.36) ₹ | 2021-12-31 | consolidated",
+      "b_summary": "Delhivery Limited | basic_loss_per_share | (3.40) INR | FY24 | consolidated",
+      "source": "missed_pair",
+      "cross_doc": true
+    },
+    {
+      "a_id": "e30a2626cb0c46be",
+      "b_id": "a92640e96e884e80",
+      "gold": "TEMPORAL_CHANGE",
+      "why": "Same corporate identity number for the same company; the leading letter changed from U (unlisted) in the 2022 prospectus to L (listed) in the FY24 annual report after the IPO, so the identifier evolved rather than conflicting.",
+      "a_summary": "Delhivery Limited | corporate_identity_number | U63090DL2011PLC221234 | - | standalone",
+      "b_summary": "Delhivery Limited | cin | L63090DL2011PLC221234 | - | standalone",
+      "source": "missed_pair",
+      "cross_doc": true
+    },
+    {
+      "a_id": "d8e9ae9dcb20416c",
+      "b_id": "9d42c9a60b2c4999",
+      "gold": "CORROBORATES",
+      "why": "Both documents carry the same income-tax matter in appeal at 344.92 million; the annual report shows it unchanged across FY23 and FY24, confirming the prospectus figure for the same ongoing matter.",
+      "a_summary": "Contingent liabilities | income_tax_matter_in_appeal | 344.92 ₹ million | 2021-12-31 | consolidated",
+      "b_summary": "Group | contingent_liability_income_tax | 344.92 million INR | 2024-03-31 | consolidated",
+      "source": "missed_pair",
+      "cross_doc": true
+    },
+    {
+      "a_id": "021b4d35fe8046a1",
+      "b_id": "e995a0b79de444ed",
+      "gold": "CORROBORATES",
+      "why": "Both documents carry the same service-tax matter in appeal at 622.58 / 622.59 million; a rounding difference on the same unchanged contingent liability.",
+      "a_summary": "Contingent liabilities | service_tax_matter_in_appeal | 622.58 ₹ million | 2021-12-31 | consolidated",
+      "b_summary": "Group | contingent_liability_service_tax | 622.59 million INR | 2024-03-31 | consolidated",
+      "source": "missed_pair",
+      "cross_doc": true
+    },
+    {
+      "a_id": "c40ce65a630149c3",
+      "b_id": "e69d311ffe0d4c3b",
+      "gold": "CORROBORATES",
+      "why": "Same BSE scrip code 543529 for the same listed issuer in both documents.",
+      "a_summary": "BSE Limited | stock_code | 543529 | - | consolidated",
+      "b_summary": "Delhivery Limited | bse_scrip_code | 543529 | - | standalone",
+      "source": "missed_pair",
+      "cross_doc": true
+    },
+    {
+      "a_id": "d64d6b396c074294",
+      "b_id": "9ccae0c3932c4e45",
+      "gold": "CORROBORATES",
+      "why": "Same logistics infrastructure footprint; the annual report's 'about 19 million square feet' is the deck's 18.82 million sq ft for Q4-FY24.",
+      "a_summary": "Delhivery | logistics_infrastructure_area | 19 million square feet | - | consolidated",
+      "b_summary": "Infrastructure | area_million_sq_ft | 18.82 million sq ft. | Q4-FY24 | consolidated",
+      "source": "missed_pair",
+      "cross_doc": true
+    },
+    {
+      "a_id": "a664e49763624417",
+      "b_id": "d2c3a2dac8bc424a",
+      "gold": "CORROBORATES",
+      "why": "Same FY24 pin-code reach; the annual report's 'more than 18,700' is consistent with the deck's precise 18,793 at Q4-FY24.",
+      "a_summary": "Delhivery | pin_code_reach | 18700 pin codes | - | India",
+      "b_summary": "Pin-code reach | count | 18793 | Q4-FY24 | consolidated",
+      "source": "missed_pair",
+      "cross_doc": true
+    }
+  ]
+}

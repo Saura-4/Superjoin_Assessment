@@ -9,7 +9,7 @@ def test_extract_cache_key_stable_across_processes():
     seen: list[str] = []
 
     class Rec(MockProvider):
-        def generate_json(self, prompt, system="", cache_key=""):
+        def generate_json(self, prompt, system="", cache_key="", namespace=""):
             seen.append(cache_key)
             return {"facts": []}
 
