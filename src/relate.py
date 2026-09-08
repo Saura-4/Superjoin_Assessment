@@ -221,6 +221,16 @@ def relate_new_facts(conn: sqlite3.Connection, provider: LLMProvider, facts: lis
             f"SELECT * FROM facts WHERE collection_id IN ({placeholders})", tuple(scope)).fetchall()]
     for fact in facts:
         for cand in find_candidates(conn, fact, collection_ids, pool=pool):
+            if fact.get("predicate") != cand.get("predicate"):
+                # different predicate names: only worth judging when the numbers
+                # or the period already agree (alias wording); otherwise the pair
+                # is unjudgeable noise (e.g. generic "count" vs "shipment_count").
+                va, vb = fact.get("value_norm"), cand.get("value_norm")
+                pa, pb = fact.get("period_norm") or "", cand.get("period_norm") or ""
+                same_val = values_equal(va, vb) is True if va is not None and vb is not None else False
+                same_per = bool(pa and pb and pa == pb)
+                if not (same_val or same_per):
+                    continue
             dec = deterministic_decide(fact, cand)
             if dec is None:
                 # LLM judgment is reserved for cross-document ambiguity: within one

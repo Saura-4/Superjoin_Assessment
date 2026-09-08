@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.db import init_db  # noqa: E402
 from src.extract import recalibrate_confidence  # noqa: E402
+from src.normalize import normalize_fact_dict  # noqa: E402
 
 
 def main():
@@ -36,12 +37,28 @@ def main():
         corrob.add(r[1])
 
     plan = []
+    renorm = 0
     for f in facts:
-        new = recalibrate_confidence(f["confidence"], ev.get(f["id"], ""))
-        if f["id"] in corrob:
-            new = min(0.95, round(new + 0.05, 3))
-        if abs(new - f["confidence"]) > 1e-9:
-            plan.append((f["id"], f["confidence"], new))
+        # confidence: only touch never-recalibrated facts (exactly 1.0).
+        # Recalibration is NOT idempotent (quote penalty would apply twice).
+        if abs(f["confidence"] - 1.0) < 1e-9:
+            new = recalibrate_confidence(f["confidence"], ev.get(f["id"], ""))
+            if f["id"] in corrob:
+                new = min(0.95, round(new + 0.05, 3))
+            if abs(new - f["confidence"]) > 1e-9:
+                plan.append((f["id"], f["confidence"], new))
+        # re-derive normalization (unit/value/period rules evolve; raws are truth)
+        enriched = normalize_fact_dict({
+            "predicate": f["predicate"], "value_raw": f["value_raw"], "unit_raw": f["unit_raw"],
+            "period_raw": f["period_raw"], "confidence": f["confidence"]})
+        if (enriched["value_norm"] != f["value_norm"] or enriched["unit_norm"] != f["unit_norm"]
+                or enriched["period_norm"] != f["period_norm"]):
+            renorm += 1
+            if args.apply:
+                conn.execute("UPDATE facts SET value_norm=?, unit_norm=?, period_norm=? WHERE id=?",
+                             (enriched["value_norm"], enriched["unit_norm"],
+                              enriched["period_norm"], f["id"]))
+    print(f"renormalized={renorm}")
 
     before = Counter(round(f["confidence"], 2) for f in facts)
     after_vals = {fid: new for fid, _, new in plan}

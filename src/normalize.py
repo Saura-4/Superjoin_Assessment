@@ -111,6 +111,20 @@ _MONTHS = {m: i + 1 for i, m in enumerate(
      "august", "september", "october", "november", "december"])}
 _MONTHS.update({m[:3]: i for m, i in list(_MONTHS.items())})
 
+_DATE_RES = [
+    re.compile(r"(Jan\w*|Feb\w*|Mar\w*|Apr\w*|May|Jun\w*|Jul\w*|Aug\w*|Sep\w*|Oct\w*|Nov\w*|Dec\w*)\s+\d{1,2},?\s+20\d{2}", re.I),
+    re.compile(r"\b\d{1,2}[/-]\d{1,2}[/-]20\d{2}\b"),
+    re.compile(r"\b20\d{2}[/-]\d{1,2}[/-]\d{1,2}\b"),
+]
+
+
+def looks_like_date(text: str) -> bool:
+    t = (text or "").strip()
+    if not t or parse_first_number(t) is None:
+        return False
+    # a date contains a day/month/year structure, not just a stray number
+    return any(rx.search(t) for rx in _DATE_RES)
+
 
 def normalize_period(period_raw: str) -> str:
     """FY24, Q4-FY24, YYYY-MM-DD, or cleaned passthrough."""
@@ -147,6 +161,8 @@ def normalize_period(period_raw: str) -> str:
 def normalize_value(value_raw: str, unit_raw: str = "") -> tuple[Optional[float], str]:
     """Return (value_norm absolute, unit_norm canonical). None when non-numeric."""
     blob = f"{value_raw} {unit_raw}"
+    if looks_like_date(value_raw) and not is_percent(blob):
+        return None, "DATE"  # dates compare semantically, never as day-of-month arithmetic
     if is_percent(blob):
         num = parse_first_number(value_raw)
         return (num, "PERCENT") if num is not None else (None, "PERCENT")

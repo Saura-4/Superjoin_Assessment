@@ -1,0 +1,44 @@
+{
+ "model": "gemini-3.1-flash-lite",
+ "docs": [
+  {
+   "file": "03-delhivery-q4-fy24-earnings-presentation.pdf",
+   "seconds": 586.2,
+   "pages": 27,
+   "duplicate": false,
+   "facts_added": 184,
+   "relationships_added": 450,
+   "failures": [
+    {
+     "page": 2,
+     "kind": "extraction_failure",
+     "detail": "no extractable text layer (chart/scan?); no facts fabricated"
+    },
+    {
+     "page": 4,
+     "kind": "extraction_failure",
+     "detail": "no extractable text layer (chart/scan?); no facts fabricated"
+    },
+    {
+     "page": 18,
+     "kind": "extraction_failure",
+     "detail": "no extractable text layer (chart/scan?); no facts fabricated"
+    }
+   ]
+  }
+ ],
+ "started": 1788870810.6190948,
+ "total_seconds": 586.2,
+ "collection": {
+  "documents": 3,
+  "facts": 1652,
+  "relationships": 629
+ },
+ "relationships_by_type": {
+  "CORROBORATES": 122,
+  "RECONCILED": 118,
+  "TEMPORAL_CHANGE": 229,
+  "CONTRADICTS": 145,
+  "UNCERTAIN": 15
+ }
+}

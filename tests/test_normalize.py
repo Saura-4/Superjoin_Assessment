@@ -70,3 +70,11 @@ def test_usd_and_bare_scale_units():
     assert (v, u) == (2_000_000_000.0, "USD")
     v, u = normalize_value("₹8,142 Cr", "")
     assert u == "INR"  # unchanged
+
+
+def test_dates_are_not_day_numbers():
+    assert normalize_value("October 1, 2021", "") == (None, "DATE")
+    assert normalize_value("July 01, 2024", "") == (None, "DATE")
+    assert normalize_value("March 31, 2024", "") == (None, "DATE")
+    assert normalize_value("FY24", "")[1] != "DATE"
+    assert normalize_value("740 Mn", "") == (740_000_000.0, "COUNT")
