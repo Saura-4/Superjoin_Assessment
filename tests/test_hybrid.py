@@ -68,6 +68,17 @@ def test_05_semantic_retrieval(tmp_path):
     assert hits and hits[0][0] == f2["id"]
 
 
+def test_05b_numpy_path_matches_python(tmp_path):
+    np = pytest.importorskip("numpy")
+    conn, c, d1, d2, f1, f2, idx = _index_two_docs(tmp_path)
+    f3 = _fact(conn, c, d2, subj="Other", pred="zzz", claim="q")
+    idx.vectors[f3["id"]] = [0.0, 1.0]
+    hits = idx.search([1.0, 0.0], top_k=10)
+    assert [h[0] for h in hits] == [f1["id"], f2["id"], f3["id"]]
+    assert hits[0][1] == pytest.approx(1.0) and hits[-1][1] == pytest.approx(0.0)
+    conn.close()
+
+
 def test_06_union_07_dedupe_08_same_doc_exclusion(tmp_path):
     conn, c, d1, d2, f1, f2, idx = _index_two_docs(tmp_path)
     f3 = _fact(conn, c, d1, subj="Delhivery", pred="revenue", claim="c3")
