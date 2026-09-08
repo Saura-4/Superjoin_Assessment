@@ -66,7 +66,7 @@ def main():
     print(f"facts={len(facts)} to_update={len(plan)}")
     print("before:", sorted(before.items()))
     print("after: ", sorted(after.items()))
-    if args.apply and plan:
+    if args.apply and (plan or renorm):
         for fid, _, new in plan:
             conn.execute("UPDATE facts SET confidence=? WHERE id=?", (new, fid))
         conn.commit()
