@@ -471,3 +471,59 @@ The system accepts unseen PDFs and demonstrates the four required cases without 
 The repository runs from README instructions, accepts new PDFs, shows evidence and cross-document relationships, and explains limitations/next steps.
 
 For final submission, the reviewer should be able to understand what is implemented, reproduce the core workflow, see the four mandatory cases, and clearly distinguish implemented functionality from optional future improvements.
+
+## 22. Implementation Status — 2026-09-08 (Phase C run + TASK3 hybrid pilot)
+
+Supersedes the counts in §19 with verified live numbers. `context/TASK.md` remains unchanged.
+
+### Keyed run (local `data/run_delhivery.db`, git-ignored)
+
+- 227/227 pages ingested; **1652 facts + 1652 evidence rows**, 357 distinct predicates
+- **572+ relationships**; confidence recalibrated (cap 0.9 single-source, quote-strength
+  rules, corroboration bump; zero facts at 1.0); 121 date facts renormalized to DATE unit
+- 3 honest chart-page extraction failures (deck pp. 2, 4, 18), nothing fabricated
+- Four demo cases verified present with evidence (see `context/REPORT.md` §2).
+  Textbook Q3-PAT pair is weak in the data — use revenue-scope/appointment cases for the demo.
+
+### Providers (all behind `LLMProvider`; `src/llm.py`)
+
+- Gemini `gemini-3.1-flash-lite` primary (15 RPM pacing, key+model failover, dead-combo
+  circuit breaker, disk cache, browser User-Agent); fallbacks 3.5-flash-lite → 3.6/3.7/3.8.
+- Groq `llama-3.3-70b-versatile` supported (OpenAI-compat JSON mode, 30 RPM pacing,
+  fallback `llama-3.1-8b-instant`); selected via `LLM_PROVIDER=groq` + `GROQ_API_KEY`.
+  No live Groq key available yet — offline-tested only.
+- Cerebras probed and parked: Cloudflare 1010 was a Python-UA edge block (fixed with
+  browser UA), underneath which the account returns 402 payment_required. Needs billing;
+  provider NOT implemented (no untested code).
+
+### Hybrid retrieval pilot (TASK3, `context/TASK3.md`)
+
+- `src/embed.py` (`semantic_text`, `HashEmbedder`, `GeminiEmbedder`), model locked to
+  **`gemini-embedding-2`** (code-enforced, never switch — vectors incomparable across models)
+- `fact_embeddings` table (auxiliary; SQLite stays source of truth; no vector DB)
+- Real `SemanticIndex` (in-process cosine) + `hybrid_retrieve` (lexical ∪ semantic,
+  dedupe, self/same-doc exclusion) + deterministic `rerank_score`
+- Deterministic 300-fact eval set (`src/evalset.py`, 100/doc stratified) + runner
+  (`evaluations/hybrid_eval_300.py`, LLM dry-run by default)
+- Live pilot: 300 embedded; lexical 2099 / semantic 2102 / merged 2553; rerank kept 724;
+  deterministic 20; **LLM would-call 704**; semantic-only found real pairs lexical missed
+  (e.g. differing address wordings corroborated, s=1.0)
+- **Gate verdict: DO NOT SCALE.** Noise baseline (`acquired_entity ↔ fleet_size`) scores
+  cos 0.777 — within one company's filings everything is semantically close, so cosine
+  alone can't discriminate and rerank 0.4 lets mush through. Required before scaling:
+  period/unit prefilter ahead of cosine + tighter rerank. Remaining ~1350 embeddings
+  intentionally deferred (vectors stay valid whenever added: same model + text_hash guard).
+
+### Design rules locked by evidence this phase
+
+- LLM judges **cross-document pairs only**; same-doc ambiguity is skipped (no LLM, no row).
+- Diff-predicate pairs reach the judge only with agreeing values or periods.
+- Zero-overlap subjects with different values are UNRELATED deterministically.
+- Dates never normalize to day-numbers (DATE unit; semantic comparison only).
+- Confidence is earned by evidence (cap/bump/migration), never asserted by the model.
+
+### Verification
+
+- `pytest` → **67 passed**; `evaluate.py` → 19/19; `verify_delhivery.py` passes with local excerpts.
+- Known unaudited area: post-gate CONTRADICTS sample (~130) — spot-check before filming.
+- Next: retrieval-precision fix → re-run 300 gate → UI pass → README final → ≤3-min video → submission.
