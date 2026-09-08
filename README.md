@@ -35,6 +35,20 @@ Without a key the app runs fully offline on the mock provider (extraction return
 empty, deterministic engine + evaluations still run). No credentials are committed;
 see `.gitignore` (`data/`, `*.db`, `.env` excluded).
 
+## Demo video (≤3 min)
+
+> **Video link: _TODO — paste demo URL here before submitting_**
+
+Script: 0:00–0:20 problem (messy PDFs → grounded facts → cross-doc relationships);
+0:20–0:45 upload one PDF (max-pages 3 for speed) and watch facts + evidence appear;
+0:45–2:30 the four cases in the Demo Cases tab — 740Mn parcels corroborated,
+resignation temporal change, revenue scope reconciliation, chart-page failure;
+2:30–3:00 engineering choices (provenance-first, deterministic-before-LLM,
+selective retrieval, honest uncertainty).
+
+To demo against the pre-processed data in this repo: `APP_DB=data/run_delhivery.db streamlit run app.py`
+(requires the local run DB; keys load automatically from `.env`).
+
 ## Starter data (git-ignored, local-only)
 
 The starter PDF excerpts are intentionally **not** in git. A fresh clone contains
@@ -101,14 +115,21 @@ persist relationship → Streamlit inspect
 - **Candidate retrieval (`src/retrieve.py`):** predicate/subject compatibility +
   unit match filter, ranked (predicate > subject > period > cross-doc), capped at 20.
   Scope defaults to current collection; `selected`/`all` still filter selectively —
-  enabling cross-collection never means all-vs-all. Embeddings (if ever added) sit
-  behind `SemanticIndex` for retrieval only.
+  enabling cross-collection never means all-vs-all. Hybrid semantic retrieval
+  (`SemanticIndex` over `fact_embeddings`, model locked to `gemini-embedding-2`) is
+  implemented and gated: lexical ∪ cosine candidates, deduped, structured rerank —
+  embeddings propose, deterministic math disposes, LLM judges only cross-doc ambiguity.
 - **Relationship reasoning (`src/relate.py`):** deterministic ladder first —
   granularity check (Q3-FY24 vs FY24 → `RECONCILED`), same-period value compare
-  within 2% (`CORROBORATES`), scope-explained gaps (`RECONCILED`), cross-period
-  numeric change (`TEMPORAL_CHANGE`), same-period conflict (`CONTRADICTS`) —
-  then `llm_judge` (facts + evidence snippets only) for semantic/ambiguous pairs.
-  Vocabulary is extensible data; demo values are not rules.
+  within 2% (`CORROBORATES`, percent-aware rounding), scope-explained gaps
+  (`RECONCILED`), cross-period numeric change (`TEMPORAL_CHANGE`), same-period conflict
+  (`CONTRADICTS`) — then `llm_judge` (facts + evidence snippets only) for semantic/ambiguous pairs.
+  Guards learned from real data: different entities never blind-contradict, dates are never
+  day-number arithmetic, diff-predicate pairs need agreeing values/periods, LLM judges
+  cross-document pairs only. Single entry point `classify_pair`. Vocabulary is extensible
+  data; demo values are not rules.
+- **Confidence is earned, not asserted:** single-source facts capped at 0.9 with
+  quote-strength adjustments; corroboration bumps to 0.95; nothing reaches 1.0.
 - **Incremental (`src/pipeline.py`):** content-hash dedup (re-upload = reuse),
   only **new** facts are compared against relevant existing ones; jobs table tracks
   runs. Large PDFs handled by page slicing + `max_pages` cost control.
@@ -148,22 +169,26 @@ demo fits comfortably in free-tier quotas (429s are retried with backoff).
 ## Tests / evaluation
 
 ```bash
-python -m pytest tests/ -q          # 34 tests; 4 dataset tests skip without local excerpts
+python -m pytest tests/ -q          # 78 tests; 4 dataset tests skip without local excerpts
 python evaluations/evaluate.py      # 19 offline checks from expected_cases.json (never imported by prod code)
 python evaluations/verify_delhivery.py  # real-PDF evidence + decision verification
+python evaluations/retrieval_precision.py --db data/run_delhivery.db  # hand-label scorecard (read-only, offline)
 ```
 
 ## Limitations and Next Steps
 
+- Measured honesty: hand-labeled scorecard (`evaluations/relationship_labels.json`,
+  130 pairs) grades exact-match **30%**, macro-F1 45% — strong on temporal/reconciled,
+  over-eager on contradictions (rounding, generic predicates, thin qualifiers).
+  The scorecard, not eyeballing, gates further tuning.
 - Text-layer only: scanned/chart pages yield `empty/low` honestly; **vision fallback**
   (render page → multimodal extract → same schema + confidence) is the top next step —
   failure taxonomy in `src/failures.py` already reserves the path.
 - Mock offline mode extracts nothing (by design — no fabrication); needs key for live facts.
-- Retrieval is token-based; a light embedding index (`sqlite-vec`/FAISS) behind
-  `SemanticIndex` would help paraphrased predicates at scale.
+- 300+ facts lack periods; sparse DATE linkage — caps temporal recall; documented, accepted.
 - No bboxes yet (quotes + page numbers only), no multi-user auth, single SQLite file.
-- Next: vision fallback → embedding retrieval → span highlights → eval on
-  india-macroeconomy set (GDP vintages/forecast-vs-actual) → batched background jobs.
+- Next: qualifier backfill → embedding precision (period/unit prefilter is in, needs re-gate) →
+  vision fallback → eval on india-macroeconomy set → batched background jobs.
 
 ## Additional Notes
 

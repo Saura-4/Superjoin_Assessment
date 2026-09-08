@@ -26,6 +26,21 @@ from src.db import (
 from src.llm import get_provider
 from src.pipeline import collection_stats, get_or_create_collection, process_document
 
+
+def _load_dotenv(path=".env"):
+    """stdlib .env loader so `streamlit run app.py` picks up local keys."""
+    if not os.path.isfile(path):
+        return
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip())
+
+
+_load_dotenv()
+
 DB_PATH = os.environ.get("APP_DB", "data/app.db")
 DATA_DIR = os.environ.get("DATA_DIR", "data/files")
 
