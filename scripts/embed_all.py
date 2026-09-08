@@ -89,7 +89,7 @@ def read_keys(env):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--db", default="data/run_delhivery.db")
-    ap.add_argument("--workers", type=int, default=2)
+    ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--limit", type=int, default=None,
                     help="cap new embeddings this run (quota budgeting)")
     ap.add_argument("--per-key", type=int, default=200,
@@ -107,8 +107,8 @@ def main():
     print(f"missing: {len(todo)}, live keys: {len(keys)}, per-key cap: {args.per_key}", flush=True)
     # round-robin split across live keys only
     chunks = [todo[i::len(keys)] for i in range(len(keys))]
-    # safe pacing: 2 workers x 2.5s ~= 48/min, well under the 100 RPM ceiling
-    parts = [(GeminiEmbedder(api_key=k, min_interval_s=2.5), jobs[:args.per_key])
+    # ~90/min: 4 workers x 2.7s pacing rides under the 100 RPM ceiling
+    parts = [(GeminiEmbedder(api_key=k, min_interval_s=2.7), jobs)
              for k, jobs in zip(keys, chunks)]
     total = 0
     for emb, jobs in parts:
