@@ -371,14 +371,26 @@ def create_relationship(
 
 
 def list_relationships(
-    conn: sqlite3.Connection, collection_id: str, rel_type: Optional[str] = None, limit: int = 1000
+    conn: sqlite3.Connection, collection_id: str, rel_type: Optional[str] = None, limit: int = 1000,
+    cross_doc_only: bool = False,
 ) -> list[dict[str, Any]]:
-    q = "SELECT * FROM relationships WHERE collection_id = ?"
-    args: list[Any] = [collection_id]
-    if rel_type:
-        q += " AND type = ?"
-        args.append(rel_type)
-    q += " ORDER BY created_at LIMIT ?"
+    if cross_doc_only:
+        q = """SELECT r.* FROM relationships r
+               JOIN facts fa ON r.fact_a_id = fa.id
+               JOIN facts fb ON r.fact_b_id = fb.id
+               WHERE r.collection_id = ? AND fa.document_id != fb.document_id"""
+        args: list[Any] = [collection_id]
+        if rel_type:
+            q += " AND r.type = ?"
+            args.append(rel_type)
+        q += " ORDER BY r.created_at LIMIT ?"
+    else:
+        q = "SELECT * FROM relationships WHERE collection_id = ?"
+        args = [collection_id]
+        if rel_type:
+            q += " AND type = ?"
+            args.append(rel_type)
+        q += " ORDER BY created_at LIMIT ?"
     args.append(limit)
     return [dict(r) for r in conn.execute(q, tuple(args)).fetchall()]
 

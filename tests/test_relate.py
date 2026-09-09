@@ -212,3 +212,14 @@ def test_classify_pair_contract():
     pct_a = dict(base, predicate="m", value_norm=1.6, unit_norm="PERCENT")
     pct_b = dict(pct_a, id="f", document_id="d2", value_norm=1.56)
     assert classify_pair(pct_a, pct_b)["type"] == "CORROBORATES"
+
+
+def test_compatible_non_identical_subjects_defer():
+    """Different line items (e.g. Total equity vs Total liabilities) sharing generic predicate
+    and overlapping token 'Total' must not blindly contradict; they must defer to judgment."""
+    a = _fact(subject="Total equity", predicate="amount", value_norm=59798e6,
+              unit_norm="INR", period_norm="2021-12-31", scope="consolidated")
+    b = _fact(subject="Total liabilities", predicate="amount", value_norm=24496e6,
+              unit_norm="INR", period_norm="2021-12-31", scope="consolidated")
+    assert deterministic_decide(a, b) is None
+

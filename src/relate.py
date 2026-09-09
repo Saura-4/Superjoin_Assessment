@@ -128,6 +128,15 @@ def deterministic_decide(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]
             return {"type": "RECONCILED", "confidence": 0.75,
                     "reason": f"Same period {pa or ''} but different scopes ('{a.get('scope')}' vs '{b.get('scope')}'); scope explains the gap.",
                     "dimensions": {"scope": [a.get("scope"), b.get("scope")]}}
+        # Guard: subjects that are compatible but NOT identical are likely
+        # different line items sharing a generic predicate (e.g. 'Total equity'
+        # vs 'Total liabilities' both extracted as predicate='amount').
+        # Only auto-contradict when subjects truly match; otherwise defer.
+        import re as _re
+        _ta = set(t for t in _re.split(r"[^a-z0-9]+", (a.get("subject") or "").lower()) if t)
+        _tb = set(t for t in _re.split(r"[^a-z0-9]+", (b.get("subject") or "").lower()) if t)
+        if _ta != _tb:
+            return None  # different items under same predicate name — needs judgment
         return {"type": "CONTRADICTS", "confidence": 0.7,
                 "reason": f"Same {a.get('predicate')} for {pa or 'same period'} and scope differs numerically beyond rounding ({va:,.2f} vs {vb:,.2f} {ua}).",
                 "dimensions": {"value": [va, vb]}}

@@ -17,7 +17,7 @@ python evaluations/evaluate.py
 python evaluations/verify_delhivery.py
 
 # 2) run the UI
-streamlit run app.py
+python -m streamlit run app.py
 # open the shown localhost URL
 ```
 
@@ -28,7 +28,7 @@ Optional (real extraction + ambiguous-case judgments; free tier):
 set GEMINI_API_KEY=your_key        # Windows cmd; $env:GEMINI_API_KEY="..." in PowerShell
 set GEMINI_MODEL=gemini-3.1-flash-lite  # default (verified free-tier, most RPD headroom)
 set LLM_PROVIDER=gemini
-streamlit run app.py
+python -m streamlit run app.py
 ```
 
 Without a key the app runs fully offline on the mock provider (extraction returns
@@ -46,8 +46,8 @@ resignation temporal change, revenue scope reconciliation, chart-page failure;
 2:30–3:00 engineering choices (provenance-first, deterministic-before-LLM,
 selective retrieval, honest uncertainty).
 
-To demo against the pre-processed data in this repo: `APP_DB=data/run_delhivery.db streamlit run app.py`
-(requires the local run DB; keys load automatically from `.env`).
+To demo against the pre-processed data in this repo: `python -m streamlit run app.py`
+(automatically detects `data/run_delhivery.db`; keys load from `.env`).
 
 ## Starter data (git-ignored, local-only)
 
@@ -124,10 +124,11 @@ persist relationship → Streamlit inspect
   within 2% (`CORROBORATES`, percent-aware rounding), scope-explained gaps
   (`RECONCILED`), cross-period numeric change (`TEMPORAL_CHANGE`), same-period conflict
   (`CONTRADICTS`) — then `llm_judge` (facts + evidence snippets only) for semantic/ambiguous pairs.
-  Guards learned from real data: different entities never blind-contradict, dates are never
-  day-number arithmetic, diff-predicate pairs need agreeing values/periods, LLM judges
-  cross-document pairs only. Single entry point `classify_pair`. Vocabulary is extensible
-  data; demo values are not rules.
+  Guards learned from real data: different entities never blind-contradict, non-identical
+  subjects under generic predicates (e.g. balance-sheet line items) defer instead of false
+  contradiction, dates are never day-number arithmetic, diff-predicate pairs need agreeing
+  values/periods, LLM judges cross-document pairs only. Single entry point `classify_pair`.
+  Vocabulary is extensible data; demo values are not rules.
 - **Confidence is earned, not asserted:** single-source facts capped at 0.9 with
   quote-strength adjustments; corroboration bumps to 0.95; nothing reaches 1.0.
 - **Incremental (`src/pipeline.py`):** content-hash dedup (re-upload = reuse),
@@ -169,7 +170,7 @@ demo fits comfortably in free-tier quotas (429s are retried with backoff).
 ## Tests / evaluation
 
 ```bash
-python -m pytest tests/ -q          # 78 tests; 4 dataset tests skip without local excerpts
+python -m pytest tests/ -q          # 79 tests; 4 dataset tests skip without local excerpts
 python evaluations/evaluate.py      # 19 offline checks from expected_cases.json (never imported by prod code)
 python evaluations/verify_delhivery.py  # real-PDF evidence + decision verification
 python evaluations/retrieval_precision.py --db data/run_delhivery.db  # hand-label scorecard (read-only, offline)
