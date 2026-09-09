@@ -35,14 +35,14 @@ Without a key the app runs fully offline on the mock provider (extraction return
 empty, deterministic engine + evaluations still run). No credentials are committed;
 see `.gitignore` (`data/`, `*.db`, `.env` excluded).
 
-## Demo video (≤3 min)
+## Video summary
 
 > **Video link: https://drive.google.com/file/d/12QYa_BcDZ9ZJLm391LoOVJKPHEiK_koB/view?usp=sharing** (showcase screen recording, no audio)
 >
 > *Note: against the submission deadline I could only record the visual showcase —
-> no audio or subtitles. The narration below states everything the video demonstrates.*
+> no audio or subtitles. The summary below states everything the video demonstrates.*
 
-## Demo walkthrough (what the video shows, narrated here)
+The video walks through the following, in order:
 
 **The idea.** Important facts hide across PDFs, written differently each time. This Fact
 Knowledge Layer pulls out each fact with its proof — document, page, exact quote — and
