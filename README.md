@@ -37,7 +37,10 @@ see `.gitignore` (`data/`, `*.db`, `.env` excluded).
 
 ## Demo video (≤3 min)
 
-> **Video link: https://drive.google.com/file/d/12QYa_BcDZ9ZJLm391LoOVJKPHEiK_koB/view?usp=sharing** (showcase screen recording)
+> **Video link: https://drive.google.com/file/d/12QYa_BcDZ9ZJLm391LoOVJKPHEiK_koB/view?usp=sharing** (showcase screen recording, no audio)
+>
+> *Note: against the submission deadline I could only record the visual showcase —
+> no audio or subtitles. The narration below states everything the video demonstrates.*
 
 ## Demo walkthrough (what the video shows, narrated here)
 
