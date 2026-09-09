@@ -37,7 +37,45 @@ see `.gitignore` (`data/`, `*.db`, `.env` excluded).
 
 ## Demo video (≤3 min)
 
-> **Video link: https://drive.google.com/file/d/12QYa_BcDZ9ZJLm391LoOVJKPHEiK_koB/view?usp=sharing** (3-minute showcase screen recording, no audio)
+> **Video link: https://drive.google.com/file/d/12QYa_BcDZ9ZJLm391LoOVJKPHEiK_koB/view?usp=sharing** (showcase screen recording)
+
+## Demo walkthrough (what the video shows, narrated here)
+
+**The idea.** Important facts hide across PDFs, written differently each time. This Fact
+Knowledge Layer pulls out each fact with its proof — document, page, exact quote — and
+links the same fact across documents: they agree, they conflict, or they agree once you
+see the context. Deterministic rules decide the obvious; the LLM judges only genuine
+ambiguity. Provenance over black boxes.
+
+**Upload.** Any PDF joins the active collection (or starts a new one) and is processed
+incrementally — new facts are compared against existing ones without rebuilding. Text
+extracts page by page with per-page quality grading; chart-only pages are flagged as
+`empty_no_text`, never fabricated. A free Gemini key powers extraction (visible in the
+sidebar); without one the app runs in offline demo mode. The run behind this demo:
+3 Delhivery documents, 227 pages → **1652 facts, 572 relationships**.
+
+**Facts.** Every fact shows subject, predicate, raw + normalized value, unit, period,
+scope, confidence — and the source quote below. Values normalize first: `₹8,142 Cr`
+and `₹81,415 Mn` are recognized as the same number (81,420,000,000 vs 81,415,380,000)
+with no LLM doing arithmetic; dates are never reduced to day-numbers. Confidence is
+earned, never asserted: capped at 0.9 single-source, bumped on corroboration, nothing
+at 1.0.
+
+**Case 1 — corroborated.** 740M express parcels in FY24, stated in the annual report
+and the earnings deck in different words (`shipment_count` vs `count`), same normalized
+value and period. Also: revenue 8142 Cr ↔ 81,415 Mn, EBITDA 127 Cr ↔ 1266 Mn, DIN
+matches (Romesh Sobti, Saugata Gupta).
+
+**Case 2 — temporal change.** Resignation September 2021 → March 2024 for the same
+officer; director fees 5.13 (9M-2021) → 8.40 (FY24). Recorded as change over time,
+never as contradiction.
+
+**Case 3 — reconciled by context.** Same revenue, different numbers: consolidated
+81,415.38 Mn vs standalone 74,540.82 Mn — scope names the gap. Same pattern for
+quarterly-vs-annual granularity (Q4 vs FY24) and distinct appointment events.
+
+**Case 4 — extraction failure.** Deck pages 2, 4, 18 have no text layer; the page audit
+lists them as failures with character counts. Uncertainty surfaced, zero fabrication.
 
 Script: 0:00–0:20 problem (messy PDFs → grounded facts → cross-doc relationships);
 0:20–0:45 upload one PDF (max-pages 3 for speed) and watch facts + evidence appear;
