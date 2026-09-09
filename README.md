@@ -240,10 +240,3 @@ python evaluations/retrieval_precision.py --db data/run_delhivery.db  # hand-lab
 - Sample flow for graders without a key: run pytest + both evaluation scripts, then
   use the UI with the mock provider to inspect pipeline states, or set the free key
   for the full 4-case demo.
-
-## Before You Submit (grader checklist)
-
-- [x] Runs from instructions, accepts new PDFs via UI
-- [x] Facts carry source evidence; relationships are fact-to-fact with reasons
-- [x] Four cases retrievable in Demo Cases view
-- [x] Approach + limitations documented; video to be recorded (≤3 min: upload → fact → 4 cases)
