@@ -37,7 +37,7 @@ see `.gitignore` (`data/`, `*.db`, `.env` excluded).
 
 ## Demo video (≤3 min)
 
-> **Video link: _TODO — paste demo URL here before submitting_**
+> **Video link: https://drive.google.com/file/d/12QYa_BcDZ9ZJLm391LoOVJKPHEiK_koB/view?usp=sharing** (3-minute showcase screen recording, no audio)
 
 Script: 0:00–0:20 problem (messy PDFs → grounded facts → cross-doc relationships);
 0:20–0:45 upload one PDF (max-pages 3 for speed) and watch facts + evidence appear;
