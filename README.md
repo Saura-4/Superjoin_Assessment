@@ -80,16 +80,6 @@ quarterly-vs-annual granularity (Q4 vs FY24) and distinct appointment events.
 **Case 4 — extraction failure.** Deck pages 2, 4, 18 have no text layer; the page audit
 lists them as failures with character counts. Uncertainty surfaced, zero fabrication.
 
-Script: 0:00–0:20 problem (messy PDFs → grounded facts → cross-doc relationships);
-0:20–0:45 upload one PDF (max-pages 3 for speed) and watch facts + evidence appear;
-0:45–2:30 the four cases in the Demo Cases tab — 740Mn parcels corroborated,
-resignation temporal change, revenue scope reconciliation, chart-page failure;
-2:30–3:00 engineering choices (provenance-first, deterministic-before-LLM,
-selective retrieval, honest uncertainty).
-
-To demo against the pre-processed data in this repo: `python -m streamlit run app.py`
-(automatically detects `data/run_delhivery.db`; keys load from `.env`).
-
 ## Starter data (git-ignored, local-only)
 
 The starter PDF excerpts are intentionally **not** in git. A fresh clone contains
