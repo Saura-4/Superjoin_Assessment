@@ -44,6 +44,43 @@ see `.gitignore` (`data/`, `*.db`, `.env` excluded).
 
 The video walks through the following, in order:
 
+### Case 1 — corroborated across documents, expressed differently
+
+Same registered office, written with different abbreviations in the 2022 prospectus
+(p.30) and the FY24 annual report (p.30) — the assignment's own "differently written
+addresses" example, matched with verbatim quotes on both sides.
+
+![Case 1: corroborated registered-office address](screenshots/case1-corroboration-address.png)
+
+### Case 2 — temporal change + a likely contradiction, shown honestly
+
+Adjusted EBITDA for the nine months to Dec 2021 (−348.01 Mn) vs FY21 (−2,258 Mn):
+same metric, different periods — change over time, not conflict.
+
+![Case 2: temporal change in adjusted EBITDA](screenshots/case2-temporal-change.png)
+
+The flagged likely contradiction is EBITDA margin 1.6% (deck) vs 1.56% (annual report),
+same FY24 consolidated scope. On inspection this is a 0.04pp rounding difference, not a
+real disagreement — it is shown as flagged-with-capped-confidence rather than hidden,
+which is exactly how borderline cases should surface.
+
+![Case 2b: likely contradiction under review](screenshots/case2b-likely-contradiction.png)
+
+### Case 3 — apparent contradiction explained by context
+
+EBITDA ₹46 Cr in Q4-FY24 vs ₹1,266.41 Mn in FY24: same metric, quarterly vs full-year
+granularity — different slices, no conflict. Same pattern holds for revenue scope
+(consolidated vs standalone) and distinct appointment events.
+
+![Case 3: reconciled by granularity](screenshots/case3-reconciled-granularity.png)
+
+### Case 4 — extraction failure, handled without fabrication
+
+Deck page 2 (and pp. 4, 18) carry no text layer — 32 extractable characters. The page is
+recorded `empty_no_text` and skipped; zero facts are invented for it.
+
+![Case 4: extraction failure](screenshots/case4-extraction-failure.png)
+
 **The idea.** Important facts hide across PDFs, written differently each time. This Fact
 Knowledge Layer pulls out each fact with its proof — document, page, exact quote — and
 links the same fact across documents: they agree, they conflict, or they agree once you
